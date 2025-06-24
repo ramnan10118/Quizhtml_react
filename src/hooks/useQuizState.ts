@@ -106,29 +106,27 @@ export function useQuizState(isHost: boolean = false) {
   }, []);
 
   const changeQuestion = useCallback((direction: 'next' | 'prev') => {
-    setQuizState(prev => {
-      let newQuestionNumber = prev.currentQuestion;
-      
-      if (direction === 'next' && prev.currentQuestion < prev.totalQuestions) {
-        newQuestionNumber = prev.currentQuestion + 1;
-      } else if (direction === 'prev' && prev.currentQuestion > 1) {
-        newQuestionNumber = prev.currentQuestion - 1;
-      }
-      
-      const newQuestionData = QUIZ_QUESTIONS[newQuestionNumber - 1];
-      
-      return {
-        ...prev,
-        currentQuestion: newQuestionNumber,
-        currentQuestionData: newQuestionData || null,
-        buzzOrder: [],
-        rankings: [],
-        canBuzz: !prev.isHost,
-      };
-    });
+    let newQuestionNumber = quizState.currentQuestion;
     
-    return quizState.currentQuestion;
-  }, [quizState.currentQuestion]);
+    if (direction === 'next' && quizState.currentQuestion < quizState.totalQuestions) {
+      newQuestionNumber = quizState.currentQuestion + 1;
+    } else if (direction === 'prev' && quizState.currentQuestion > 1) {
+      newQuestionNumber = quizState.currentQuestion - 1;
+    }
+    
+    const newQuestionData = QUIZ_QUESTIONS[newQuestionNumber - 1];
+    
+    setQuizState(prev => ({
+      ...prev,
+      currentQuestion: newQuestionNumber,
+      currentQuestionData: newQuestionData || null,
+      buzzOrder: [],
+      rankings: [],
+      canBuzz: !prev.isHost,
+    }));
+    
+    return newQuestionNumber;
+  }, [quizState.currentQuestion, quizState.totalQuestions]);
 
   const setSinglePlayerBuzzState = useCallback((canBuzz: boolean) => {
     setQuizState(prev => ({

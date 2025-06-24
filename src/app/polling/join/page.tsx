@@ -45,12 +45,6 @@ export default function PollingJoinPage() {
       console.log('Connected to server');
       setIsConnected(true);
       setSocket(socketInstance);
-      
-      // Auto-register if team name is available
-      if (teamName) {
-        socketInstance.emit('register-participant', { teamName });
-        setIsRegistered(true);
-      }
     });
 
     socketInstance.on('disconnect', () => {
@@ -104,7 +98,7 @@ export default function PollingJoinPage() {
     return () => {
       socketInstance.disconnect();
     };
-  }, [teamName, setCurrentPoll, updatePoll, setVoteStatus]);
+  }, [setCurrentPoll, updatePoll, setVoteStatus]);
 
   const handleRegister = () => {
     if (!teamName.trim()) {
