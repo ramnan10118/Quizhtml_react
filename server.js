@@ -16,6 +16,11 @@ let buzzOrder = [];
 const teams = new Map();
 const scores = new Map();
 
+// Polling state
+let currentPoll = null;
+let pollHistory = [];
+let pollParticipants = new Map(); // socketId -> teamName
+
 // Quiz questions
 const questions = [
   {
@@ -232,7 +237,170 @@ app.prepare().then(() => {
         questionData: questions[currentQuestion - 1]
       });
     });
+
+    // POLLING EVENTS
+
+    // Register participant for polling
+    socket.on('register-participant', (data) => {
+      console.log('Participant registered for polling:', data.teamName);
+      pollParticipants.set(socket.id, data.teamName);
+      
+      // Send current poll if exists
+      if (currentPoll) {
+        socket.emit('poll-created', currentPoll);
+      }
+    });
+
+    // Create new poll
+    socket.on('create-poll', (data) => {
+      console.log('Creating new poll:', data.question);
+      
+      currentPoll = {
+        id: Date.now().toString(),
+        question: data.question,
+        options: data.options,
+        votes: new Map(),
+        isActive: true,
+        showResults: false,
+        createdAt: Date.now()
+      };
+
+      // Broadcast new poll to all clients
+      io.emit('poll-created', currentPoll);
+    });
+
+    // Cast vote
+    socket.on('cast-vote', (data) => {
+      if (!currentPoll || !currentPoll.isActive) {
+        socket.emit('error', { message: 'No active poll' });
+        return;
+      }
+
+      const teamName = pollParticipants.get(socket.id);
+      if (!teamName) {
+        socket.emit('error', { message: 'Not registered as participant' });
+        return;
+      }
+
+      // Check if already voted
+      if (currentPoll.votes.has(teamName)) {
+        socket.emit('error', { message: 'Already voted' });
+        return;
+      }
+
+      // Record vote
+      currentPoll.votes.set(teamName, data.optionIndex);
+      
+      // Create vote data
+      const voteData = {
+        pollId: currentPoll.id,
+        teamName: teamName,
+        optionIndex: data.optionIndex,
+        timestamp: Date.now()
+      };
+
+      // Confirm vote to voter
+      socket.emit('vote-cast', voteData);
+
+      // Send updated poll data to all clients
+      const pollUpdate = {
+        poll: currentPoll,
+        results: calculatePollResults(currentPoll)
+      };
+      
+      io.emit('poll-updated', pollUpdate);
+    });
+
+    // Close poll
+    socket.on('close-poll', (pollId) => {
+      if (currentPoll && currentPoll.id === pollId) {
+        currentPoll.isActive = false;
+        currentPoll.closedAt = Date.now();
+        
+        // Add to history
+        pollHistory.unshift({ ...currentPoll });
+        
+        // Send final results
+        const results = calculatePollResults(currentPoll);
+        io.emit('poll-closed', results);
+      }
+    });
+
+    // Toggle results visibility
+    socket.on('toggle-results', (pollId) => {
+      if (currentPoll && currentPoll.id === pollId) {
+        currentPoll.showResults = !currentPoll.showResults;
+        
+        const pollUpdate = {
+          poll: currentPoll,
+          results: calculatePollResults(currentPoll)
+        };
+        
+        io.emit('poll-updated', pollUpdate);
+      }
+    });
+
+    // Request current poll
+    socket.on('request-current-poll', () => {
+      if (currentPoll) {
+        socket.emit('poll-created', currentPoll);
+        
+        const pollUpdate = {
+          poll: currentPoll,
+          results: calculatePollResults(currentPoll)
+        };
+        
+        socket.emit('poll-updated', pollUpdate);
+      }
+    });
+
+    // Handle disconnect for polling
+    socket.on('disconnect', () => {
+      const teamName = teams.get(socket.id) || pollParticipants.get(socket.id);
+      
+      // Quiz cleanup
+      if (teams.has(socket.id)) {
+        teams.delete(socket.id);
+        scores.delete(teamName);
+        io.emit('disconnect-team', socket.id);
+      }
+      
+      // Polling cleanup
+      if (pollParticipants.has(socket.id)) {
+        pollParticipants.delete(socket.id);
+      }
+      
+      console.log('Client disconnected:', socket.id);
+    });
   });
+
+  // Helper function to calculate poll results
+  function calculatePollResults(poll) {
+    const voteCounts = new Array(poll.options.length).fill(0);
+    const voterNames = {};
+    
+    // Initialize voter names arrays
+    for (let i = 0; i < poll.options.length; i++) {
+      voterNames[i] = [];
+    }
+    
+    // Count votes and collect voter names
+    poll.votes.forEach((optionIndex, teamName) => {
+      if (optionIndex >= 0 && optionIndex < poll.options.length) {
+        voteCounts[optionIndex]++;
+        voterNames[optionIndex].push(teamName);
+      }
+    });
+
+    return {
+      pollId: poll.id,
+      question: poll.question,
+      options: poll.options,
+      voteCounts,
+      totalVotes: poll.votes.size,
+      voterNames
+    };
+  }
 
   httpServer.listen(port, () => {
     console.log(`> Ready on http://${hostname}:${port}`);

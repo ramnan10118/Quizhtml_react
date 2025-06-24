@@ -25,70 +25,41 @@ export default function HomePage() {
             </p>
           </div>
 
-          <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
-            {/* Host Card */}
-            <Card className="bg-white/10 backdrop-blur border-white/20 hover:bg-white/15 transition-all duration-200 hover:scale-105">
-              <CardHeader className="text-center">
-                <div className="text-4xl mb-4">🎮</div>
-                <CardTitle className="text-white text-2xl">Host a Quiz</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <p className="text-slate-300 text-center">
-                  Control the quiz, manage questions, and track team scores in real-time.
-                </p>
-                <div className="space-y-2 text-sm text-slate-400">
-                  <div className="flex items-center space-x-2">
-                    <span>✅</span>
-                    <span>13 engaging questions</span>
+          <div className="flex justify-center">
+            <Link href="/mode" className="block">
+              <Card className="bg-white/10 backdrop-blur border-white/20 hover:bg-white/15 transition-all duration-200 hover:scale-105 max-w-md">
+                <CardHeader className="text-center">
+                  <div className="text-6xl mb-4">🚀</div>
+                  <CardTitle className="text-white text-3xl">Get Started</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <p className="text-slate-300 text-center text-lg">
+                    Choose between Quiz Competition or Live Polling to create engaging interactive experiences.
+                  </p>
+                  <div className="space-y-3 text-sm text-slate-400">
+                    <div className="flex items-center space-x-3">
+                      <span className="text-green-400">🎯</span>
+                      <span>Interactive Quiz Competitions</span>
+                    </div>
+                    <div className="flex items-center space-x-3">
+                      <span className="text-green-400">🗳️</span>
+                      <span>Live Audience Polling</span>
+                    </div>
+                    <div className="flex items-center space-x-3">
+                      <span className="text-green-400">📱</span>
+                      <span>Mobile-Optimized Experience</span>
+                    </div>
+                    <div className="flex items-center space-x-3">
+                      <span className="text-green-400">⚡</span>
+                      <span>Real-Time Interactions</span>
+                    </div>
                   </div>
-                  <div className="flex items-center space-x-2">
-                    <span>✅</span>
-                    <span>Real-time scoring</span>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <span>✅</span>
-                    <span>Live answer reveals</span>
-                  </div>
-                </div>
-                <Link href="/host" className="block">
-                  <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white">
-                    Start Hosting
+                  <Button className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white text-lg py-3">
+                    Choose Your Mode
                   </Button>
-                </Link>
-              </CardContent>
-            </Card>
-
-            {/* Participant Card */}
-            <Card className="bg-white/10 backdrop-blur border-white/20 hover:bg-white/15 transition-all duration-200 hover:scale-105">
-              <CardHeader className="text-center">
-                <div className="text-4xl mb-4">🚨</div>
-                <CardTitle className="text-white text-2xl">Join as Player</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <p className="text-slate-300 text-center">
-                  Buzz in to answer questions and compete with other teams for the top score.
-                </p>
-                <div className="space-y-2 text-sm text-slate-400">
-                  <div className="flex items-center space-x-2">
-                    <span>✅</span>
-                    <span>Mobile-optimized buzzer</span>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <span>✅</span>
-                    <span>Haptic feedback</span>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <span>✅</span>
-                    <span>Celebration animations</span>
-                  </div>
-                </div>
-                <Link href="/join" className="block">
-                  <Button className="w-full bg-red-600 hover:bg-red-700 text-white">
-                    Join Quiz
-                  </Button>
-                </Link>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+            </Link>
           </div>
 
           {/* Features Section */}
