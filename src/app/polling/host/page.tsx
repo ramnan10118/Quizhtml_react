@@ -165,28 +165,20 @@ export default function PollingHostPage() {
           {/* Active Poll Section */}
           {currentPoll && (
             <div className="grid lg:grid-cols-4 gap-6">
-              {/* Poll Controls */}
+              {/* Left: Poll Controls */}
               <div className="lg:col-span-1">
-                <div className="space-y-6">
-                  <PollControls
-                    currentPoll={currentPoll}
-                    onClosePoll={handleClosePoll}
-                    onToggleResults={handleToggleResults}
-                    onNewPoll={handleNewPoll}
-                    showResults={showResults}
-                    totalVotes={pollResults?.totalVotes || 0}
-                  />
-                  
-                  <SharePanel
-                    joinPath="/polling/join"
-                    title="Invite Voters"
-                    description="Share with participants to join the poll"
-                  />
-                </div>
+                <PollControls
+                  currentPoll={currentPoll}
+                  onClosePoll={handleClosePoll}
+                  onToggleResults={handleToggleResults}
+                  onNewPoll={handleNewPoll}
+                  showResults={showResults}
+                  totalVotes={pollResults?.totalVotes || 0}
+                />
               </div>
 
-              {/* Poll Results */}
-              <div className="lg:col-span-3">
+              {/* Middle: Poll Results */}
+              <div className="lg:col-span-2">
                 {pollResults ? (
                   <PollResults
                     results={pollResults}
@@ -199,10 +191,19 @@ export default function PollingHostPage() {
                       Waiting for votes...
                     </h3>
                     <p className="text-slate-300">
-                      Use the share panel on the left to invite participants to join your poll
+                      Use the share panel on the right to invite participants to join your poll
                     </p>
                   </div>
                 )}
+              </div>
+
+              {/* Right: Share Panel */}
+              <div className="lg:col-span-1">
+                <SharePanel
+                  joinPath="/polling/join"
+                  title="Invite Voters"
+                  description="Share with participants to join the poll"
+                />
               </div>
             </div>
           )}

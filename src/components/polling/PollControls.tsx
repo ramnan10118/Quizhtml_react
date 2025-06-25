@@ -61,11 +61,11 @@ export function PollControls({
             <div className="grid grid-cols-2 gap-4 text-center">
               <div>
                 <div className="text-2xl font-bold text-slate-800">{totalVotes}</div>
-                <div className="text-sm text-slate-600">Total Votes</div>
+                <div className="text-xs text-slate-600 whitespace-nowrap">Total Votes</div>
               </div>
               <div>
                 <div className="text-2xl font-bold text-slate-800">{currentPoll.options.length}</div>
-                <div className="text-sm text-slate-600">Options</div>
+                <div className="text-xs text-slate-600 whitespace-nowrap">Options</div>
               </div>
             </div>
           </div>
@@ -105,12 +105,19 @@ export function PollControls({
             className="w-full bg-purple-600 hover:bg-purple-700"
             disabled={hasActivePoll}
           >
-            {hasActivePoll ? (
-              <>⏳ Close current poll to create new one</>
-            ) : (
-              <>➕ Create New Poll</>
-            )}
+            ➕ Create New Poll
           </Button>
+
+          {/* Commented out for now - can bring back later */}
+          {/* {hasActivePoll && (
+            <Button
+              onClick={onNewPoll}
+              className="w-full bg-purple-600 hover:bg-purple-700"
+              disabled={false}
+            >
+              ⏳ Close current poll to create new one
+            </Button>
+          )} */}
         </div>
 
         {/* Guidelines */}
