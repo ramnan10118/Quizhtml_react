@@ -7,6 +7,7 @@ import { QuestionDisplay } from '@/components/quiz/QuestionDisplay';
 import { QuizControls } from '@/components/quiz/QuizControls';
 import { ScoreBoard } from '@/components/quiz/ScoreBoard';
 import { ParticipantList } from '@/components/quiz/ParticipantList';
+import { SharePanel } from '@/components/ui/SharePanel';
 import { useSocket } from '@/hooks/useSocket';
 import { useQuizState } from '@/hooks/useQuizState';
 
@@ -116,7 +117,7 @@ export default function HostPage() {
 
       <main className="flex-1 p-6">
         <div className="max-w-7xl mx-auto">
-          <div className="grid lg:grid-cols-3 gap-6">
+          <div className="grid lg:grid-cols-4 gap-6">
             {/* Left Column - Question & Controls */}
             <div className="lg:col-span-2 space-y-6">
               <QuestionDisplay
@@ -144,6 +145,15 @@ export default function HostPage() {
               <ParticipantList 
                 rankings={quizState.rankings}
                 onAddPoint={handleAddPoint}
+              />
+            </div>
+
+            {/* Share Panel */}
+            <div className="space-y-6">
+              <SharePanel
+                joinPath="/quiz/join"
+                title="Invite Players"
+                description="Share with participants to join the quiz"
               />
             </div>
           </div>

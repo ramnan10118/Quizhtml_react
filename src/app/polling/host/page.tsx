@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { io, Socket } from 'socket.io-client';
 import { Button } from '@/components/ui/Button';
 import { Header } from '@/components/layout/Header';
+import { SharePanel } from '@/components/ui/SharePanel';
 import { PollCreator } from '@/components/polling/PollCreator';
 import { PollResults } from '@/components/polling/PollResults';
 import { PollControls } from '@/components/polling/PollControls';
@@ -163,21 +164,29 @@ export default function PollingHostPage() {
 
           {/* Active Poll Section */}
           {currentPoll && (
-            <div className="grid lg:grid-cols-3 gap-6">
+            <div className="grid lg:grid-cols-4 gap-6">
               {/* Poll Controls */}
               <div className="lg:col-span-1">
-                <PollControls
-                  currentPoll={currentPoll}
-                  onClosePoll={handleClosePoll}
-                  onToggleResults={handleToggleResults}
-                  onNewPoll={handleNewPoll}
-                  showResults={showResults}
-                  totalVotes={pollResults?.totalVotes || 0}
-                />
+                <div className="space-y-6">
+                  <PollControls
+                    currentPoll={currentPoll}
+                    onClosePoll={handleClosePoll}
+                    onToggleResults={handleToggleResults}
+                    onNewPoll={handleNewPoll}
+                    showResults={showResults}
+                    totalVotes={pollResults?.totalVotes || 0}
+                  />
+                  
+                  <SharePanel
+                    joinPath="/polling/join"
+                    title="Invite Voters"
+                    description="Share with participants to join the poll"
+                  />
+                </div>
               </div>
 
               {/* Poll Results */}
-              <div className="lg:col-span-2">
+              <div className="lg:col-span-3">
                 {pollResults ? (
                   <PollResults
                     results={pollResults}
@@ -190,14 +199,8 @@ export default function PollingHostPage() {
                       Waiting for votes...
                     </h3>
                     <p className="text-slate-300">
-                      Share the polling link with participants to start collecting responses
+                      Use the share panel on the left to invite participants to join your poll
                     </p>
-                    <div className="mt-4 p-4 bg-slate-800 rounded-lg">
-                      <p className="text-sm text-slate-400 mb-2">Participant Link:</p>
-                      <code className="text-cyan-300 text-sm">
-                        {typeof window !== 'undefined' ? `${window.location.origin}/polling/join` : '/polling/join'}
-                      </code>
-                    </div>
                   </div>
                 )}
               </div>
