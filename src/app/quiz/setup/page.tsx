@@ -260,7 +260,7 @@ export default function QuizSetupPage() {
     try {
       const templateData = {
         title: templateTitle.trim(),
-        description: templateDescription.trim() || null,
+        description: templateDescription.trim() || undefined,
         type: 'quiz' as const,
         content: { questions },
         status: 'draft' as const

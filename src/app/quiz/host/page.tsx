@@ -36,7 +36,7 @@ export default function HostPage() {
     if (customQuestions) {
       try {
         const questions = JSON.parse(customQuestions);
-        socket?.emit('set-custom-questions' as any, { questions });
+        socket.emit('set-custom-questions', { questions });
       } catch (e) {
         console.error('Error parsing custom questions:', e);
       }

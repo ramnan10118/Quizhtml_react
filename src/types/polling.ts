@@ -44,6 +44,8 @@ export interface PollingServerToClientEvents {
   'poll-results': (results: PollResults) => void;
   'connect': () => void;
   'disconnect': () => void;
+  'error': (data: { message: string }) => void;
+  'connect_error': (error: Error) => void;
 }
 
 export interface PollingClientToServerEvents {
