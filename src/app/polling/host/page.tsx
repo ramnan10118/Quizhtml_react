@@ -25,8 +25,8 @@ export default function PollingHostPage() {
     setCurrentPoll,
     updatePoll,
     closePoll,
-    resetPollState,
-    getPollResults
+    // resetPollState,
+    // getPollResults
   } = usePollState(true);
 
   useEffect(() => {
@@ -101,7 +101,7 @@ export default function PollingHostPage() {
   };
 
   const currentPoll = pollState.currentPoll;
-  const hasActivePoll = currentPoll?.isActive;
+  // const hasActivePoll = currentPoll?.isActive;
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-dark-900 dark">

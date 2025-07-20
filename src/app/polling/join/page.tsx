@@ -6,7 +6,7 @@ import { io, Socket } from 'socket.io-client';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Header } from '@/components/layout/Header';
-import { PollDisplay } from '@/components/polling/PollDisplay';
+// import { PollDisplay } from '@/components/polling/PollDisplay';
 import { usePollState } from '@/hooks/usePollState';
 import { Poll, PollResults } from '@/types/polling';
 
@@ -25,7 +25,7 @@ export default function PollingJoinPage() {
     setCurrentPoll,
     updatePoll,
     setVoteStatus,
-    getPollResults
+    // getPollResults
   } = usePollState(false);
 
   useEffect(() => {

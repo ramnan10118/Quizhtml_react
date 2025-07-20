@@ -7,10 +7,11 @@ export async function POST(
   { params }: { params: { id: string } }
 ) {
   try {
+    const { id } = params
     const body = await request.json()
     const { title } = body
 
-    const duplicatedTemplate = await templates.duplicate(params.id, title)
+    const duplicatedTemplate = await templates.duplicate(id, title)
 
     return NextResponse.json({
       success: true,

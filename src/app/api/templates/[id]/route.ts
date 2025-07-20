@@ -4,10 +4,11 @@ import { templates } from '@/lib/templates'
 // GET /api/templates/[id] - Get a single template
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const template = await templates.getById(params.id)
+    const { id } = await params
+    const template = await templates.getById(id)
     
     if (!template) {
       return NextResponse.json(
@@ -35,13 +36,14 @@ export async function GET(
 // PUT /api/templates/[id] - Update a template
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const body = await request.json()
     const { title, description, content, status } = body
 
-    const template = await templates.update(params.id, {
+    const template = await templates.update(id, {
       title,
       description,
       content,
@@ -67,10 +69,11 @@ export async function PUT(
 // DELETE /api/templates/[id] - Delete a template
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    await templates.delete(params.id)
+    const { id } = await params
+    await templates.delete(id)
 
     return NextResponse.json({
       success: true,
