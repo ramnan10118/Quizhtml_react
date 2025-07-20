@@ -29,7 +29,7 @@ function Button3D({ onBuzz, disabled, canBuzz }: { onBuzz: () => void; disabled?
     }
   });
 
-  const handleClick = (event: THREE.Event) => {
+  const handleClick = (event: any) => {
     event.stopPropagation();
     if (!disabled && canBuzz) {
       setIsPressed(true);

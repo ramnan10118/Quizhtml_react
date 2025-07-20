@@ -32,7 +32,7 @@ function Button3D({ onBuzz, disabled, canBuzz }: { onBuzz: () => void; disabled?
     }
   });
 
-  const handlePointerDown = (event: THREE.Event) => {
+  const handlePointerDown = (event: any) => {
     event.stopPropagation();
     if (!disabled && canBuzz) {
       setIsPressed(true);
