@@ -13,7 +13,7 @@ import { templates } from '@/lib/templates';
 
 
 
-const DEFAULT_QUESTIONS: QuizQuestion[] = [];
+// const DEFAULT_QUESTIONS: QuizQuestion[] = [];
 
 export default function QuizSetupPage() {
   const router = useRouter();

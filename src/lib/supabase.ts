@@ -40,7 +40,7 @@ export interface Database {
           description: string | null
           type: 'quiz' | 'poll'
           status: 'draft' | 'live' | 'completed'
-          content: any // JSON content
+          content: Record<string, unknown> // JSON content
           created_at: string
           updated_at: string
         }
@@ -51,7 +51,7 @@ export interface Database {
           description?: string | null
           type: 'quiz' | 'poll'
           status?: 'draft' | 'live' | 'completed'
-          content: any
+          content: Record<string, unknown>
           created_at?: string
           updated_at?: string
         }
@@ -62,7 +62,7 @@ export interface Database {
           description?: string | null
           type?: 'quiz' | 'poll'
           status?: 'draft' | 'live' | 'completed'
-          content?: any
+          content?: Record<string, unknown>
           created_at?: string
           updated_at?: string
         }

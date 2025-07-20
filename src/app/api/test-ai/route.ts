@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     // Test if environment variables are accessible
     const hasApiKey = !!process.env.OPENAI_API_KEY;

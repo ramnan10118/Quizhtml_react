@@ -72,7 +72,7 @@ export default function SignUpPage() {
               Account Created Successfully!
             </h2>
             <p className="text-gray-600 dark:text-gray-400 mb-4">
-              Welcome to the platform! You'll be redirected to your dashboard in a moment.
+              Welcome to the platform! You&apos;ll be redirected to your dashboard in a moment.
             </p>
             <div className="flex items-center justify-center space-x-2 text-sm text-gray-500">
               <span className="animate-spin">🔄</span>

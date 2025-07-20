@@ -7,7 +7,7 @@ import { supabase } from '@/lib/supabase';
 
 interface AuthContextType {
   user: User | null;
-  profile: any | null;
+  profile: Record<string, unknown> | null;
   loading: boolean;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
@@ -31,7 +31,7 @@ export const useAuth = () => {
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [profile, setProfile] = useState<any | null>(null);
+  const [profile, setProfile] = useState<Record<string, unknown> | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -68,7 +68,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     );
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, []); // Empty dependency array is correct here - we only want this to run once
 
   const loadUserProfile = async (userId: string) => {
     try {

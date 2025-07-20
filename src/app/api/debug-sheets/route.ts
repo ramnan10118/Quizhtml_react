@@ -34,7 +34,7 @@ export async function GET() {
           });
           actualRange = `${sheetName}!A:G`;
           break;
-        } catch (err) {
+        } catch {
           console.log(`Failed to access sheet: ${sheetName}`);
         }
       }

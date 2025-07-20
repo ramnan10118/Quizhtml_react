@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
+import { Card, CardContent, CardHeader } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { QuizQuestion } from '@/types/quiz';
 import { getOptionLabel, cn } from '@/lib/utils';
@@ -27,6 +27,8 @@ export function QuestionDisplay({
   onRevealAnswer,
   className
 }: QuestionDisplayProps) {
+  const [isRevealing, setIsRevealing] = useState(false);
+
   if (!question) {
     return (
       <Card className={cn('w-full', className)}>
@@ -36,8 +38,6 @@ export function QuestionDisplay({
       </Card>
     );
   }
-
-  const [isRevealing, setIsRevealing] = useState(false);
 
   const handleRevealAnswer = async () => {
     if (onRevealAnswer) {

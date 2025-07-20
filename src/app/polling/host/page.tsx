@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { io, Socket } from 'socket.io-client';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
-import { Header } from '@/components/layout/Header';
+// import { Header } from '@/components/layout/Header';
 import { SharePanel } from '@/components/ui/SharePanel';
 import { PollCreator } from '@/components/polling/PollCreator';
 import { PollResults } from '@/components/polling/PollResults';

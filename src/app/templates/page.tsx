@@ -162,7 +162,7 @@ export default function TemplatesPage() {
               <div className="flex gap-2">
                 <select
                   value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value as any)}
+                  onChange={(e) => setStatusFilter(e.target.value as 'all' | 'draft' | 'live' | 'completed')}
                   className="px-3 py-2 border border-gray-300 dark:border-dark-600 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white dark:bg-dark-700 text-gray-900 dark:text-gray-100"
                 >
                   <option value="all">All Status</option>
@@ -172,7 +172,7 @@ export default function TemplatesPage() {
                 </select>
                 <select
                   value={typeFilter}
-                  onChange={(e) => setTypeFilter(e.target.value as any)}
+                  onChange={(e) => setTypeFilter(e.target.value as 'all' | 'quiz' | 'poll')}
                   className="px-3 py-2 border border-gray-300 dark:border-dark-600 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white dark:bg-dark-700 text-gray-900 dark:text-gray-100"
                 >
                   <option value="all">All Types</option>
@@ -244,7 +244,7 @@ export default function TemplatesPage() {
                     </p>
                   )}
                   <div className="text-xs text-gray-500 dark:text-gray-500 mb-4">
-                    {template.content?.questions ? template.content.questions.length : 0} questions • 
+                    {template.content?.questions ? (template.content.questions as unknown[]).length : 0} questions • 
                     Created {new Date(template.created_at).toLocaleDateString()}
                   </div>
                   <div className="flex space-x-2">

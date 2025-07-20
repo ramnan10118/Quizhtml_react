@@ -7,7 +7,7 @@ export interface Template {
   description: string | null
   type: 'quiz' | 'poll'
   status: 'draft' | 'live' | 'completed'
-  content: any // JSON content (questions, options, etc.)
+  content: Record<string, unknown> // JSON content (questions, options, etc.)
   created_at: string
   updated_at: string
 }
@@ -16,14 +16,14 @@ export interface CreateTemplateData {
   title: string
   description?: string
   type: 'quiz' | 'poll'
-  content: any
+  content: Record<string, unknown>
   status?: 'draft' | 'live' | 'completed'
 }
 
 export interface UpdateTemplateData {
   title?: string
   description?: string
-  content?: any
+  content?: Record<string, unknown>
   status?: 'draft' | 'live' | 'completed'
 }
 
