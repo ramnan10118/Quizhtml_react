@@ -141,12 +141,14 @@ export function useQuizState(isHost: boolean = false) {
       newQuestionNumber = quizState.currentQuestion - 1;
     }
     
-    const newQuestionData = questions[newQuestionNumber - 1];
+    const newQuestionData = newQuestionNumber > 0 && newQuestionNumber <= questions.length 
+      ? questions[newQuestionNumber - 1] 
+      : null;
     
     setQuizState(prev => ({
       ...prev,
       currentQuestion: newQuestionNumber,
-      currentQuestionData: newQuestionData || null,
+      currentQuestionData: newQuestionData,
       buzzOrder: [],
       rankings: [],
       canBuzz: !prev.isHost,
