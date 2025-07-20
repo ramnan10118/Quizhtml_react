@@ -35,17 +35,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Get initial session
+    // Get initial session with timeout
     const getSession = async () => {
       try {
-        const currentUser = await auth.getCurrentUser();
-        setUser(currentUser);
+        // Add a 10-second timeout to prevent infinite loading
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Auth timeout')), 10000)
+        );
+        
+        const currentUser = await Promise.race([
+          auth.getCurrentUser(),
+          timeoutPromise
+        ]);
+        
+        setUser(currentUser as User | null);
         
         if (currentUser) {
-          await loadUserProfile(currentUser.id);
+          await loadUserProfile((currentUser as User).id);
         }
       } catch (error) {
         console.error('Error getting session:', error);
+        // If there's an error, assume no user and continue
+        setUser(null);
       } finally {
         setLoading(false);
       }
@@ -72,11 +83,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const loadUserProfile = async (userId: string) => {
     try {
-      const userProfile = await auth.getUserProfile(userId);
-      setProfile(userProfile);
+      // Add timeout for profile loading too
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Profile timeout')), 5000)
+      );
+      
+      const userProfile = await Promise.race([
+        auth.getUserProfile(userId),
+        timeoutPromise
+      ]);
+      
+      setProfile(userProfile as Record<string, unknown>);
     } catch (error) {
       console.error('Error loading profile:', error);
-      // Profile might not exist yet, that's okay
+      // Profile might not exist yet, that's okay - continue without it
+      setProfile(null);
     }
   };
 
