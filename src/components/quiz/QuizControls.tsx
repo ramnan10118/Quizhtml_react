@@ -39,23 +39,23 @@ export function QuizControls({
   const canGoNext = currentQuestion < totalQuestions;
 
   return (
-    <Card className={cn('w-full bg-gradient-to-br from-slate-50 to-slate-100', className)}>
+    <Card className={cn('w-full bg-gradient-to-br from-slate-50 to-slate-100 dark:from-dark-800 dark:to-dark-700', className)}>
       <CardHeader>
-        <CardTitle className="text-slate-700 flex items-center space-x-2">
+        <CardTitle className="text-slate-700 dark:text-gray-100 flex items-center space-x-2">
           <span>🎮</span>
           <span>Quiz Controls</span>
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
         {/* Question Info */}
-        <div className="bg-white rounded-lg p-4 border">
-          <div className="text-sm text-slate-600 mb-1">Current Question</div>
-          <div className="text-2xl font-bold text-slate-900">
+        <div className="bg-white dark:bg-dark-700 rounded-lg p-4 border dark:border-dark-600">
+          <div className="text-sm text-slate-600 dark:text-gray-400 mb-1">Current Question</div>
+          <div className="text-2xl font-bold text-slate-900 dark:text-gray-100">
             {currentQuestion} of {totalQuestions}
           </div>
-          <div className="w-full bg-slate-200 rounded-full h-2 mt-2">
+          <div className="w-full bg-slate-200 dark:bg-dark-600 rounded-full h-2 mt-2">
             <div
-              className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+              className="bg-blue-600 dark:bg-blue-500 h-2 rounded-full transition-all duration-300"
               style={{ width: `${(currentQuestion / totalQuestions) * 100}%` }}
             />
           </div>

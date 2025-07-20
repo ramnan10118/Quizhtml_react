@@ -27,47 +27,18 @@ export function PollControls({
   const hasPoll = currentPoll !== null;
 
   return (
-    <Card className={cn('w-full bg-gradient-to-br from-slate-50 to-slate-100', className)}>
+    <Card className={cn('w-full', className)}>
       <CardHeader>
-        <CardTitle className="text-slate-700 flex items-center space-x-2">
-          <span>🎛️</span>
-          <span>Poll Controls</span>
+        <CardTitle className="text-gray-900 dark:text-gray-100 text-lg">
+          Poll Controls
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
-        {/* Poll Status */}
+        {/* Total Votes Display */}
         {hasPoll && (
-          <div className="bg-white rounded-lg p-4 border">
-            <div className="flex items-center justify-between mb-3">
-              <div className="text-sm text-slate-600">Current Poll Status</div>
-              <div
-                className={cn(
-                  'flex items-center space-x-2 px-3 py-1 rounded-full text-xs font-medium',
-                  hasActivePoll
-                    ? 'bg-green-100 text-green-800 border border-green-200'
-                    : 'bg-gray-100 text-gray-800 border border-gray-200'
-                )}
-              >
-                <div
-                  className={cn(
-                    'w-2 h-2 rounded-full',
-                    hasActivePoll ? 'bg-green-500 animate-pulse' : 'bg-gray-400'
-                  )}
-                />
-                <span>{hasActivePoll ? 'Live & Accepting Votes' : 'Closed'}</span>
-              </div>
-            </div>
-            
-            <div className="grid grid-cols-2 gap-4 text-center">
-              <div>
-                <div className="text-2xl font-bold text-slate-800">{totalVotes}</div>
-                <div className="text-xs text-slate-600 whitespace-nowrap">Total Votes</div>
-              </div>
-              <div>
-                <div className="text-2xl font-bold text-slate-800">{currentPoll.options.length}</div>
-                <div className="text-xs text-slate-600 whitespace-nowrap">Options</div>
-              </div>
-            </div>
+          <div className="bg-gray-50 dark:bg-dark-700 rounded-lg p-6 border border-gray-200 dark:border-dark-600 text-center">
+            <div className="text-4xl font-bold text-gray-900 dark:text-gray-100 mb-2">{totalVotes}</div>
+            <div className="text-sm text-gray-600 dark:text-gray-400 font-medium">Total Votes</div>
           </div>
         )}
 
@@ -99,14 +70,15 @@ export function PollControls({
             </Button>
           )}
 
-          {/* New Poll */}
-          <Button
-            onClick={onNewPoll}
-            className="w-full bg-purple-600 hover:bg-purple-700"
-            disabled={hasActivePoll}
-          >
-            ➕ Create New Poll
-          </Button>
+          {/* New Poll - Only show when no active poll */}
+          {!hasActivePoll && (
+            <Button
+              onClick={onNewPoll}
+              className="w-full bg-purple-600 hover:bg-purple-700 dark:bg-purple-500 dark:hover:bg-purple-600"
+            >
+              ➕ Create New Poll
+            </Button>
+          )}
 
           {/* Commented out for now - can bring back later */}
           {/* {hasActivePoll && (
@@ -120,29 +92,7 @@ export function PollControls({
           )} */}
         </div>
 
-        {/* Guidelines */}
-        <div className="text-xs text-slate-500 bg-slate-100 rounded-lg p-3">
-          <p className="font-medium mb-2">💡 Host Guidelines:</p>
-          <ul className="space-y-1">
-            <li>• Allow participants time to vote before showing results</li>
-            <li>• Close polls when you&apos;re ready to move on</li>
-            <li>• Create engaging questions to boost participation</li>
-            <li>• Use results to facilitate discussion</li>
-          </ul>
-        </div>
 
-        {/* Quick Stats */}
-        {hasPoll && totalVotes > 0 && (
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-            <div className="flex items-center space-x-2 text-blue-800">
-              <span>📈</span>
-              <span className="text-sm font-medium">
-                {totalVotes} participant{totalVotes !== 1 ? 's' : ''} voted
-                {hasActivePoll && ' so far'}
-              </span>
-            </div>
-          </div>
-        )}
       </CardContent>
     </Card>
   );

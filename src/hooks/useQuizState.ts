@@ -1,10 +1,25 @@
-import { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { QuizState, QuizQuestion, RankingData, QUIZ_QUESTIONS } from '@/types/quiz';
+
+// Get custom questions from sessionStorage if available
+const getCustomQuestions = (): QuizQuestion[] => {
+  if (typeof window !== 'undefined') {
+    const stored = sessionStorage.getItem('customQuestions');
+    if (stored) {
+      try {
+        return JSON.parse(stored);
+      } catch (e) {
+        console.error('Error parsing custom questions:', e);
+      }
+    }
+  }
+  return QUIZ_QUESTIONS;
+};
 
 const initialState: QuizState = {
   currentQuestion: 1,
-  totalQuestions: QUIZ_QUESTIONS.length,
-  currentQuestionData: QUIZ_QUESTIONS[0] || null,
+  totalQuestions: 0, // Will be set after questions are loaded
+  currentQuestionData: null,
   teams: new Map(),
   scores: new Map(),
   buzzOrder: [],
@@ -14,10 +29,22 @@ const initialState: QuizState = {
 };
 
 export function useQuizState(isHost: boolean = false) {
+  const [questions, setQuestions] = useState<QuizQuestion[]>([]);
   const [quizState, setQuizState] = useState<QuizState>({
     ...initialState,
     isHost,
   });
+
+  // Initialize questions on component mount
+  useEffect(() => {
+    const customQuestions = getCustomQuestions();
+    setQuestions(customQuestions);
+    setQuizState(prev => ({
+      ...prev,
+      totalQuestions: customQuestions.length,
+      currentQuestionData: customQuestions[0] || null,
+    }));
+  }, []);
 
   const updateCurrentQuestion = useCallback((questionNumber: number, questionData: QuizQuestion) => {
     setQuizState(prev => ({
@@ -114,7 +141,7 @@ export function useQuizState(isHost: boolean = false) {
       newQuestionNumber = quizState.currentQuestion - 1;
     }
     
-    const newQuestionData = QUIZ_QUESTIONS[newQuestionNumber - 1];
+    const newQuestionData = questions[newQuestionNumber - 1];
     
     setQuizState(prev => ({
       ...prev,
@@ -126,7 +153,7 @@ export function useQuizState(isHost: boolean = false) {
     }));
     
     return newQuestionNumber;
-  }, [quizState.currentQuestion, quizState.totalQuestions]);
+  }, [quizState.currentQuestion, quizState.totalQuestions, questions]);
 
   const setSinglePlayerBuzzState = useCallback((canBuzz: boolean) => {
     setQuizState(prev => ({

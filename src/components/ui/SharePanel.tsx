@@ -47,33 +47,33 @@ export function SharePanel({ joinPath, title, description }: SharePanelProps) {
   };
 
   return (
-    <Card className="bg-white/10 backdrop-blur border-white/20">
+    <Card>
       <CardHeader>
-        <CardTitle className="text-white text-lg">{title}</CardTitle>
-        <p className="text-slate-300 text-sm">{description}</p>
+        <CardTitle className="text-gray-900 dark:text-gray-100 text-lg">{title}</CardTitle>
+        <p className="text-gray-600 dark:text-gray-400 text-sm">{description}</p>
       </CardHeader>
       <CardContent className="space-y-4">
         {/* Tabs */}
-        <div className="flex space-x-1 bg-white/5 rounded-lg p-1">
+        <div className="flex space-x-1 bg-gray-100 dark:bg-dark-700 rounded-lg p-1">
           <button
             onClick={() => setActiveTab('qr')}
-            className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
+            className={`flex-1 py-2 px-3 rounded-md text-sm font-medium transition-colors ${
               activeTab === 'qr'
-                ? 'bg-white/20 text-white'
-                : 'text-slate-400 hover:text-white'
+                ? 'bg-white dark:bg-dark-600 text-gray-900 dark:text-gray-100 shadow-sm'
+                : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100'
             }`}
           >
-            📱 QR Code
+            QR Code
           </button>
           <button
             onClick={() => setActiveTab('link')}
-            className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
+            className={`flex-1 py-2 px-3 rounded-md text-sm font-medium transition-colors ${
               activeTab === 'link'
-                ? 'bg-white/20 text-white'
-                : 'text-slate-400 hover:text-white'
+                ? 'bg-white dark:bg-dark-600 text-gray-900 dark:text-gray-100 shadow-sm'
+                : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100'
             }`}
           >
-            🔗 Link
+            Link
           </button>
         </div>
 
@@ -81,11 +81,11 @@ export function SharePanel({ joinPath, title, description }: SharePanelProps) {
         {activeTab === 'qr' && (
           <div className="text-center space-y-4">
             {qrCodeUrl && (
-              <div className="bg-white rounded-lg p-4 inline-block">
-                <img src={qrCodeUrl} alt="QR Code" className="w-48 h-48" />
+              <div className="bg-white dark:bg-gray-100 border border-gray-200 dark:border-dark-600 rounded-lg p-4 inline-block">
+                <img src={qrCodeUrl} alt="QR Code" className="w-40 h-40" />
               </div>
             )}
-            <p className="text-slate-300 text-sm">
+            <p className="text-gray-600 dark:text-gray-400 text-sm">
               Participants can scan this QR code to join instantly
             </p>
           </div>
@@ -94,17 +94,18 @@ export function SharePanel({ joinPath, title, description }: SharePanelProps) {
         {/* Link Tab */}
         {activeTab === 'link' && (
           <div className="space-y-4">
-            <div className="bg-slate-800 rounded-lg p-4">
-              <p className="text-slate-400 text-xs mb-2">Join Link:</p>
-              <code className="text-cyan-300 text-sm break-all">{joinUrl}</code>
+            <div className="bg-gray-50 dark:bg-dark-700 border border-gray-200 dark:border-dark-600 rounded-lg p-3">
+              <p className="text-gray-500 dark:text-gray-400 text-xs mb-2">Join Link:</p>
+              <code className="text-gray-800 dark:text-gray-200 text-sm break-all font-mono">{joinUrl}</code>
             </div>
             <Button
               onClick={copyToClipboard}
-              className="w-full bg-blue-600 hover:bg-blue-700"
+              variant="outline"
+              className="w-full"
             >
-              {copied ? '✅ Copied!' : '📋 Copy Link'}
+              {copied ? 'Copied!' : 'Copy Link'}
             </Button>
-            <p className="text-slate-300 text-sm text-center">
+            <p className="text-gray-600 dark:text-gray-400 text-sm text-center">
               Share this link with participants to let them join
             </p>
           </div>

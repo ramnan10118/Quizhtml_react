@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
@@ -10,11 +11,11 @@ import { QuestionDisplay } from '@/components/quiz/QuestionDisplay';
 import { BuzzerButton } from '@/components/quiz/BuzzerButton';
 import { useSocket } from '@/hooks/useSocket';
 import { useQuizState } from '@/hooks/useQuizState';
-import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { useHapticFeedback } from '@/hooks/useHapticFeedback';
 import confetti from 'canvas-confetti';
 
 export default function JoinPage() {
+  const router = useRouter();
   const { socket, connectionStatus } = useSocket();
   const {
     quizState,
@@ -22,22 +23,19 @@ export default function JoinPage() {
     setSinglePlayerBuzzState,
   } = useQuizState(false);
 
-  const [teamName, setTeamName, removeTeamName] = useLocalStorage<string>('teamName', '');
+  const [teamName, setTeamName] = useState('');
   const [isRegistered, setIsRegistered] = useState(false);
   const [inputName, setInputName] = useState('');
   const [statusMessage, setStatusMessage] = useState('');
   const [isCelebrating, setIsCelebrating] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
+  const [revealedAnswer, setRevealedAnswer] = useState<number | null>(null);
   
   const { success, error, connectionChange } = useHapticFeedback();
 
   useEffect(() => {
     setIsMounted(true);
-    if (teamName) {
-      setIsRegistered(true);
-      setInputName(teamName);
-    }
-  }, [teamName]);
+  }, []);
 
   useEffect(() => {
     if (!socket) return;
@@ -46,9 +44,7 @@ export default function JoinPage() {
     socket.on('question-change', (data) => {
       updateCurrentQuestion(data.questionNumber, data.questionData);
       setSinglePlayerBuzzState(true);
-      setStatusMessage(`Question ${data.questionNumber} started. Get ready!`);
-      
-      setTimeout(() => setStatusMessage(''), 3000);
+      setRevealedAnswer(null);
       connectionChange();
     });
 
@@ -74,6 +70,12 @@ export default function JoinPage() {
       setSinglePlayerBuzzState(true);
       setIsCelebrating(false);
       connectionChange();
+    });
+
+    socket.on('answer-revealed', (data) => {
+      if (data.revealedAnswer !== undefined && data.revealedAnswer !== null) {
+        setRevealedAnswer(data.revealedAnswer);
+      }
     });
 
     socket.on('celebrate', () => {
@@ -103,6 +105,18 @@ export default function JoinPage() {
       }, 2000);
     });
 
+    // Handle quiz ended by host
+    socket.on('quiz-ended', (data) => {
+      alert(data.message);
+      // Clear participant data
+      setTeamName('');
+      setIsRegistered(false);
+      setInputName('');
+      setSinglePlayerBuzzState(false);
+      // Redirect to mode selection
+      router.push('/mode');
+    });
+
     // Request current question on connection
     if (isRegistered && teamName) {
       socket.emit('register-team', { teamName });
@@ -113,7 +127,9 @@ export default function JoinPage() {
       socket.off('question-change');
       socket.off('buzz');
       socket.off('reset-buzzer');
+      socket.off('answer-revealed');
       socket.off('celebrate');
+      socket.off('quiz-ended');
     };
   }, [socket, updateCurrentQuestion, setSinglePlayerBuzzState, success, error, connectionChange, isRegistered, teamName]);
 
@@ -145,7 +161,7 @@ export default function JoinPage() {
 
   const handleQuitSession = () => {
     if (confirm('Are you sure you want to quit? This will end your session.')) {
-      removeTeamName();
+      setTeamName('');
       setIsRegistered(false);
       setInputName('');
       setSinglePlayerBuzzState(false);
@@ -160,7 +176,7 @@ export default function JoinPage() {
   };
 
   return (
-    <div className={`min-h-screen flex flex-col ${isCelebrating ? 'celebrating' : ''}`}>
+    <div className={`min-h-screen flex flex-col bg-gray-50 dark:bg-dark-900 dark ${isCelebrating ? 'celebrating' : ''}`}>
       <Header 
         title="Quiz Participant" 
         subtitle={isMounted && teamName ? `Team: ${teamName}` : 'Join the Quiz'}
@@ -177,13 +193,13 @@ export default function JoinPage() {
         )}
       </Header>
 
-      <main className="flex-1 flex flex-col items-center justify-center p-6 pb-32">
+      <main className="flex-1 flex flex-col items-center justify-center p-6 pb-32 bg-gray-50 dark:bg-dark-900">
         <div className="w-full max-w-md space-y-6">
           {!isRegistered ? (
             /* Registration Form */
-            <Card className="bg-white/10 backdrop-blur border-white/20">
+            <Card className="bg-white/10 dark:bg-dark-800/50 backdrop-blur border-white/20 dark:border-dark-600">
               <CardHeader>
-                <CardTitle className="text-white text-center">Join the Quiz</CardTitle>
+                <CardTitle className="text-gray-900 dark:text-gray-100 text-center">Join the Quiz</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <Input
@@ -210,13 +226,14 @@ export default function JoinPage() {
               questionNumber={quizState.currentQuestion}
               question={quizState.currentQuestionData}
               isHost={false}
-              className="bg-white/10 backdrop-blur border-white/20"
+              revealedAnswer={revealedAnswer}
+              className="bg-white/10 dark:bg-dark-800/50 backdrop-blur border-white/20 dark:border-dark-600"
             />
           )}
 
           {/* Status Message */}
           {statusMessage && (
-            <Card className="bg-blue-100 border-blue-300 text-blue-800">
+            <Card className="bg-blue-100 dark:bg-blue-900/30 border-blue-300 dark:border-blue-700 text-blue-800 dark:text-blue-200">
               <CardContent className="p-4 text-center">
                 {statusMessage}
               </CardContent>

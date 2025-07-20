@@ -41,7 +41,7 @@ export function BuzzerButton({ onBuzz, disabled = false, canBuzz = true, classNa
           'shadow-2xl shadow-red-500/40'
         )}
       >
-        🚨 BUZZ! 🚨
+        BUZZ!
       </Button>
     </div>
   );

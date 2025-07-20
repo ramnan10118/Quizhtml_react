@@ -22,7 +22,7 @@ export function PollResults({
   if (!results) {
     return (
       <Card className={cn('w-full', className)}>
-        <CardContent className="p-8 text-center text-gray-500">
+        <CardContent className="p-8 text-center text-gray-500 dark:text-gray-400">
           No poll results available
         </CardContent>
       </Card>
@@ -52,10 +52,10 @@ export function PollResults({
   };
 
   return (
-    <Card className={cn('w-full bg-gradient-to-br from-slate-50 to-slate-100', className)}>
+    <Card className={cn('w-full bg-gradient-to-br from-slate-50 to-slate-100 dark:from-dark-800 dark:to-dark-700', className)}>
       <CardHeader>
         <div className="flex items-center justify-between">
-          <CardTitle className="text-slate-700 flex items-center space-x-2">
+          <CardTitle className="text-slate-700 dark:text-gray-100 flex items-center space-x-2">
             <span>📊</span>
             <span>Poll Results</span>
           </CardTitle>
@@ -83,11 +83,11 @@ export function PollResults({
       </CardHeader>
       <CardContent className="space-y-6">
         {/* Question */}
-        <div className="bg-white rounded-lg p-6 shadow-sm border">
-          <h3 className="text-xl font-semibold text-slate-900 leading-relaxed mb-2">
+        <div className="bg-white dark:bg-dark-700 rounded-lg p-6 shadow-sm border dark:border-dark-600">
+          <h3 className="text-xl font-semibold text-slate-900 dark:text-gray-100 leading-relaxed mb-2">
             {question}
           </h3>
-          <div className="text-sm text-slate-600">
+          <div className="text-sm text-slate-600 dark:text-gray-400">
             Total responses: <span className="font-semibold">{totalVotes}</span>
           </div>
         </div>
@@ -104,8 +104,8 @@ export function PollResults({
               <div
                 key={index}
                 className={cn(
-                  'bg-white rounded-lg p-4 border transition-all duration-200',
-                  isWinner && 'border-green-300 shadow-lg ring-2 ring-green-100'
+                  'bg-white dark:bg-dark-700 rounded-lg p-4 border dark:border-dark-600 transition-all duration-200',
+                  isWinner && 'border-green-300 dark:border-green-500 shadow-lg ring-2 ring-green-100 dark:ring-green-900/30'
                 )}
               >
                 {/* Option Header */}
@@ -114,8 +114,8 @@ export function PollResults({
                     <span
                       className={cn(
                         'flex items-center justify-center w-8 h-8 rounded-full',
-                        'bg-slate-100 text-slate-700 font-semibold text-sm',
-                        isWinner && 'bg-green-200 text-green-800'
+                        'bg-slate-100 dark:bg-dark-600 text-slate-700 dark:text-gray-200 font-semibold text-sm',
+                        isWinner && 'bg-green-200 dark:bg-green-800 text-green-800 dark:text-green-200'
                       )}
                     >
                       {getOptionLabel(index)}
@@ -123,25 +123,25 @@ export function PollResults({
                     </span>
                     <span
                       className={cn(
-                        'text-slate-800 font-medium',
-                        isWinner && 'text-green-800 font-semibold'
+                        'text-slate-800 dark:text-gray-200 font-medium',
+                        isWinner && 'text-green-800 dark:text-green-200 font-semibold'
                       )}
                     >
                       {option}
                     </span>
                   </div>
                   <div className="flex items-center space-x-3">
-                    <span className="text-lg font-bold text-slate-700">
+                    <span className="text-lg font-bold text-slate-700 dark:text-gray-200">
                       {votes}
                     </span>
-                    <span className="text-sm text-slate-500 min-w-[3rem] text-right">
+                    <span className="text-sm text-slate-500 dark:text-gray-400 min-w-[3rem] text-right">
                       {percentage}%
                     </span>
                   </div>
                 </div>
 
                 {/* Progress Bar */}
-                <div className="w-full bg-slate-200 rounded-full h-3 mb-3">
+                <div className="w-full bg-slate-200 dark:bg-dark-600 rounded-full h-3 mb-3">
                   <div
                     className={cn(
                       'h-3 rounded-full transition-all duration-1000 ease-out',
@@ -154,14 +154,14 @@ export function PollResults({
                 {/* Voter Names */}
                 {showParticipants && voters.length > 0 && (
                   <div className="border-t pt-3">
-                    <div className="text-xs text-slate-600 mb-2">
+                    <div className="text-xs text-slate-600 dark:text-gray-400 mb-2">
                       Voted by: ({voters.length})
                     </div>
                     <div className="flex flex-wrap gap-1">
                       {voters.map((voterName, voterIndex) => (
                         <span
                           key={voterIndex}
-                          className="text-xs bg-slate-100 text-slate-700 px-2 py-1 rounded-full"
+                          className="text-xs bg-slate-100 dark:bg-dark-600 text-slate-700 dark:text-gray-200 px-2 py-1 rounded-full"
                         >
                           {voterName}
                         </span>
@@ -176,27 +176,27 @@ export function PollResults({
 
         {/* Summary Stats */}
         {totalVotes > 0 && (
-          <div className="bg-slate-100 rounded-lg p-4">
+          <div className="bg-slate-100 dark:bg-dark-700 rounded-lg p-4">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
               <div>
-                <div className="text-2xl font-bold text-slate-800">{totalVotes}</div>
-                <div className="text-sm text-slate-600">Total Votes</div>
+                <div className="text-2xl font-bold text-slate-800 dark:text-gray-100">{totalVotes}</div>
+                <div className="text-sm text-slate-600 dark:text-gray-400">Total Votes</div>
               </div>
               <div>
-                <div className="text-2xl font-bold text-slate-800">{options.length}</div>
-                <div className="text-sm text-slate-600">Options</div>
+                <div className="text-2xl font-bold text-slate-800 dark:text-gray-100">{options.length}</div>
+                <div className="text-sm text-slate-600 dark:text-gray-400">Options</div>
               </div>
               <div>
-                <div className="text-2xl font-bold text-green-600">
+                <div className="text-2xl font-bold text-green-600 dark:text-green-400">
                   {Math.max(...voteCounts)}
                 </div>
-                <div className="text-sm text-slate-600">Top Votes</div>
+                <div className="text-sm text-slate-600 dark:text-gray-400">Top Votes</div>
               </div>
               <div>
-                <div className="text-2xl font-bold text-blue-600">
+                <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
                   {Math.round((Math.max(...voteCounts) / totalVotes) * 100)}%
                 </div>
-                <div className="text-sm text-slate-600">Winner Share</div>
+                <div className="text-sm text-slate-600 dark:text-gray-400">Winner Share</div>
               </div>
             </div>
           </div>

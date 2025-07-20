@@ -123,14 +123,14 @@ export default function PollingJoinPage() {
   const canVote = currentPoll?.isActive && !voteSubmitted && isRegistered;
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col bg-gray-50 dark:bg-dark-900 dark">
       <Header 
         title="Join Polling Session" 
         subtitle={isMounted && teamName ? `Participant: ${teamName}` : 'Enter your name to join'}
       >
         <div className="flex items-center space-x-2">
           <div className={`w-3 h-3 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`} />
-          <span className="text-sm text-white/80">
+          <span className="text-sm text-gray-600 dark:text-gray-400">
             {isConnected ? 'Connected' : 'Connecting...'}
           </span>
           <Link href="/polling">
@@ -141,19 +141,19 @@ export default function PollingJoinPage() {
         </div>
       </Header>
       
-      <main className="flex-1 p-6">
+      <main className="flex-1 p-6 bg-gray-50 dark:bg-dark-900">
         <div className="max-w-4xl mx-auto">
           {/* Registration */}
           {!isRegistered && (
-            <Card className="bg-white/10 backdrop-blur border-white/20 max-w-md mx-auto">
+            <Card className="bg-white/10 dark:bg-dark-800/50 backdrop-blur border-white/20 dark:border-dark-600 max-w-md mx-auto">
               <CardHeader>
-                <CardTitle className="text-white text-center text-xl">
+                <CardTitle className="text-gray-900 dark:text-gray-100 text-center text-xl">
                   🙋‍♀️ Join Polling Session
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Your Name
                   </label>
                   <input
@@ -162,7 +162,7 @@ export default function PollingJoinPage() {
                     onChange={(e) => setTeamName(e.target.value)}
                     onKeyPress={(e) => e.key === 'Enter' && handleRegister()}
                     placeholder="Enter your name"
-                    className="w-full px-4 py-3 rounded-lg bg-white/10 border border-white/20 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                    className="w-full px-4 py-3 rounded-lg bg-white/10 dark:bg-dark-700 border border-gray-300 dark:border-dark-600 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-500"
                     disabled={!isConnected}
                   />
                 </div>
@@ -173,7 +173,7 @@ export default function PollingJoinPage() {
                 >
                   {isConnected ? '🗳️ Join Session' : 'Connecting...'}
                 </Button>
-                <p className="text-xs text-slate-400 text-center">
+                <p className="text-xs text-gray-500 dark:text-gray-400 text-center">
                   Your name will be visible to the host when viewing results
                 </p>
               </CardContent>
@@ -183,15 +183,15 @@ export default function PollingJoinPage() {
           {/* Waiting for Poll */}
           {isRegistered && !currentPoll && (
             <div className="text-center">
-              <div className="bg-white/10 backdrop-blur border border-white/20 rounded-lg p-8 max-w-md mx-auto">
+              <div className="bg-white/10 dark:bg-dark-800/50 backdrop-blur border border-gray-200 dark:border-dark-600 rounded-lg p-8 max-w-md mx-auto">
                 <div className="text-4xl mb-4">⏳</div>
-                <h2 className="text-xl font-semibold text-white mb-2">
+                <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-2">
                   Welcome, {teamName}!
                 </h2>
-                <p className="text-slate-300 mb-4">
+                <p className="text-gray-600 dark:text-gray-400 mb-4">
                   Waiting for the host to create a poll...
                 </p>
-                <div className="flex items-center justify-center space-x-2 text-sm text-slate-400">
+                <div className="flex items-center justify-center space-x-2 text-sm text-gray-500 dark:text-gray-400">
                   <div className="w-2 h-2 bg-cyan-500 rounded-full animate-bounce" />
                   <div className="w-2 h-2 bg-cyan-500 rounded-full animate-bounce animation-delay-100" />
                   <div className="w-2 h-2 bg-cyan-500 rounded-full animate-bounce animation-delay-200" />
@@ -204,30 +204,30 @@ export default function PollingJoinPage() {
           {isRegistered && currentPoll && (
             <div className="space-y-6">
               {/* Poll Question */}
-              <Card className="bg-white/10 backdrop-blur border-white/20">
+              <Card className="bg-white/10 dark:bg-dark-800/50 backdrop-blur border-gray-200 dark:border-dark-600">
                 <CardHeader>
                   <div className="flex items-center justify-between">
-                    <CardTitle className="text-white text-xl">
+                    <CardTitle className="text-gray-900 dark:text-gray-100 text-xl">
                       🗳️ Live Poll
                     </CardTitle>
                     <div className={`px-3 py-1 rounded-full text-xs font-medium ${
                       currentPoll.isActive 
-                        ? 'bg-green-100 text-green-800 border border-green-200'
-                        : 'bg-gray-100 text-gray-800 border border-gray-200'
+                        ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 border border-green-200 dark:border-green-700'
+                        : 'bg-gray-100 dark:bg-gray-800/50 text-gray-800 dark:text-gray-200 border border-gray-200 dark:border-gray-700'
                     }`}>
                       {currentPoll.isActive ? 'Active' : 'Closed'}
                     </div>
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <h3 className="text-xl font-semibold text-white mb-6 leading-relaxed">
+                  <h3 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-6 leading-relaxed">
                     {currentPoll.question}
                   </h3>
 
                   {/* Vote Status */}
                   {voteSubmitted && selectedOption !== null && (
-                    <div className="mb-6 p-4 bg-green-100 border border-green-200 rounded-lg">
-                      <div className="flex items-center space-x-2 text-green-800">
+                    <div className="mb-6 p-4 bg-green-100 dark:bg-green-900/30 border border-green-200 dark:border-green-700 rounded-lg">
+                      <div className="flex items-center space-x-2 text-green-800 dark:text-green-200">
                         <span>✅</span>
                         <span className="font-medium">
                           Vote submitted! You selected: {currentPoll.options[selectedOption]}
@@ -251,7 +251,7 @@ export default function PollingJoinPage() {
                             w-full p-4 text-left justify-start h-auto
                             ${isSelected 
                               ? 'bg-green-600 hover:bg-green-700 border-2 border-green-400' 
-                              : 'bg-white/10 hover:bg-white/20 border border-white/20'
+                              : 'bg-white dark:bg-dark-700 hover:bg-gray-50 dark:hover:bg-dark-600 border border-gray-200 dark:border-dark-600'
                             }
                             ${!canVote ? 'opacity-50 cursor-not-allowed' : ''}
                           `}
@@ -260,17 +260,17 @@ export default function PollingJoinPage() {
                             <div className={`
                               flex items-center justify-center w-8 h-8 rounded-full font-semibold
                               ${isSelected 
-                                ? 'bg-white text-green-600' 
-                                : 'bg-white/20 text-white'
+                                ? 'bg-white dark:bg-gray-900 text-green-600 dark:text-green-400' 
+                                : 'bg-gray-100 dark:bg-dark-600 text-gray-900 dark:text-gray-100'
                               }
                             `}>
                               {optionLetter}
                             </div>
-                            <span className="text-white font-medium flex-1">
+                            <span className="text-gray-900 dark:text-gray-100 font-medium flex-1">
                               {option}
                             </span>
                             {isSelected && (
-                              <span className="text-white">✓</span>
+                              <span className="text-gray-900 dark:text-gray-100">✓</span>
                             )}
                           </div>
                         </Button>
@@ -280,13 +280,13 @@ export default function PollingJoinPage() {
 
                   {/* Instructions */}
                   {canVote && (
-                    <p className="text-sm text-slate-400 text-center mt-4">
+                    <p className="text-sm text-gray-500 dark:text-gray-400 text-center mt-4">
                       Tap an option to cast your vote
                     </p>
                   )}
                   
                   {!currentPoll.isActive && (
-                    <p className="text-sm text-slate-400 text-center mt-4">
+                    <p className="text-sm text-gray-500 dark:text-gray-400 text-center mt-4">
                       This poll has been closed by the host
                     </p>
                   )}
@@ -296,10 +296,10 @@ export default function PollingJoinPage() {
               {/* Live Results */}
               {pollResults && (
                 <div>
-                  <h3 className="text-lg font-semibold text-white mb-4 text-center">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4 text-center">
                     📊 Live Results
                   </h3>
-                  <Card className="bg-white/10 backdrop-blur border-white/20">
+                  <Card className="bg-white/10 dark:bg-dark-800/50 backdrop-blur border-gray-200 dark:border-dark-600">
                     <CardContent className="space-y-4">
                       {pollResults.options.map((option, index) => {
                         const votes = pollResults.voteCounts[index] || 0;
@@ -315,19 +315,19 @@ export default function PollingJoinPage() {
                               <div className="flex items-center space-x-2">
                                 <span className={`
                                   w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium
-                                  ${isUserChoice ? 'bg-green-500 text-white' : 'bg-white/20 text-white'}
+                                  ${isUserChoice ? 'bg-green-500 text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-gray-100'}
                                 `}>
                                   {optionLetter}
                                 </span>
-                                <span className="text-white font-medium">{option}</span>
-                                {isUserChoice && <span className="text-green-400">← Your vote</span>}
+                                <span className="text-gray-900 dark:text-gray-100 font-medium">{option}</span>
+                                {isUserChoice && <span className="text-green-400 dark:text-green-300">← Your vote</span>}
                               </div>
                               <div className="flex items-center space-x-2">
-                                <span className="text-white font-semibold">{votes}</span>
-                                <span className="text-slate-400 text-sm">{percentage}%</span>
+                                <span className="text-gray-900 dark:text-gray-100 font-semibold">{votes}</span>
+                                <span className="text-gray-500 dark:text-gray-400 text-sm">{percentage}%</span>
                               </div>
                             </div>
-                            <div className="w-full bg-slate-700 rounded-full h-2">
+                            <div className="w-full bg-gray-300 dark:bg-gray-700 rounded-full h-2">
                               <div
                                 className={`h-2 rounded-full transition-all duration-1000 ${
                                   isUserChoice ? 'bg-green-500' : 'bg-cyan-500'
@@ -338,7 +338,7 @@ export default function PollingJoinPage() {
                           </div>
                         );
                       })}
-                      <div className="text-center text-sm text-slate-400 pt-2">
+                      <div className="text-center text-sm text-gray-500 dark:text-gray-400 pt-2">
                         Total votes: {pollResults.totalVotes}
                       </div>
                     </CardContent>

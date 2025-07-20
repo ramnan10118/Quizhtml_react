@@ -21,8 +21,8 @@ let currentPoll = null;
 let pollHistory = [];
 let pollParticipants = new Map(); // socketId -> teamName
 
-// Quiz questions
-const questions = [
+// Quiz questions - can be overridden by custom questions
+let questions = [
   {
     text: "Who has more Instagram followers?",
     options: [
@@ -178,6 +178,20 @@ app.prepare().then(() => {
       questionData: questions[currentQuestion - 1]
     });
 
+    // Handle custom questions from host
+    socket.on('set-custom-questions', (data) => {
+      console.log('Custom questions received:', data.questions.length, 'questions');
+      questions = data.questions;
+      currentQuestion = 1;
+      buzzOrder = [];
+      
+      // Send updated question to all clients
+      io.emit('question-change', {
+        questionNumber: currentQuestion,
+        questionData: questions[currentQuestion - 1]
+      });
+    });
+
     socket.on('register-team', (data) => {
       console.log('Team registered:', data.teamName);
       teams.set(socket.id, data.teamName);
@@ -220,6 +234,11 @@ app.prepare().then(() => {
       io.emit('celebrate', { teamName: data.teamName });
     });
 
+    socket.on('answer-revealed', (data) => {
+      // Broadcast answer reveal to all participants
+      io.emit('answer-revealed', data);
+    });
+
     socket.on('disconnect', () => {
       const teamName = teams.get(socket.id);
       if (teamName) {
@@ -235,6 +254,22 @@ app.prepare().then(() => {
       socket.emit('question-change', {
         questionNumber: currentQuestion,
         questionData: questions[currentQuestion - 1]
+      });
+    });
+
+    // Handle host exit quiz
+    socket.on('host-exit-quiz', () => {
+      console.log('Host is exiting quiz, notifying all participants');
+      
+      // Reset quiz state
+      currentQuestion = 1;
+      buzzOrder = [];
+      teams.clear();
+      scores.clear();
+      
+      // Notify all participants that the quiz has ended
+      io.emit('quiz-ended', {
+        message: 'The quiz has been ended by the host.'
       });
     });
 

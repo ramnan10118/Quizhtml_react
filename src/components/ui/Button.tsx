@@ -10,44 +10,47 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
   ({ className, variant = 'default', size = 'default', children, ...props }, ref) => {
     const baseClasses = [
-      'inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium',
-      'ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2',
-      'focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50',
-      'active:scale-95 transition-transform'
+      'inline-flex items-center justify-center whitespace-nowrap rounded-lg text-sm font-medium',
+      'transition-all duration-200 focus-visible:outline-none focus-visible:ring-2',
+      'focus-visible:ring-primary-500 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50',
+      'border border-transparent'
     ];
 
     const variants = {
       default: [
-        'bg-gradient-to-r from-blue-600 to-blue-700 text-white hover:from-blue-700 hover:to-blue-800',
-        'shadow-lg shadow-blue-500/25 hover:shadow-blue-500/30'
+        'bg-gray-900 text-white hover:bg-gray-800',
+        'dark:bg-gray-100 dark:text-gray-900 dark:hover:bg-gray-200',
+        'shadow-sm hover:shadow-md'
       ],
       destructive: [
-        'bg-gradient-to-r from-red-600 to-red-700 text-white hover:from-red-700 hover:to-red-800',
-        'shadow-lg shadow-red-500/25 hover:shadow-red-500/30'
+        'bg-red-600 text-white hover:bg-red-700',
+        'dark:bg-red-500 dark:hover:bg-red-600',
+        'shadow-sm hover:shadow-md'
       ],
       outline: [
-        'border border-gray-300 bg-white text-gray-900 hover:bg-gray-50',
-        'dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:hover:bg-gray-700'
+        'border-gray-200 bg-white text-gray-900 hover:bg-gray-50 hover:border-gray-300',
+        'dark:border-dark-600 dark:bg-dark-700 dark:text-gray-100 dark:hover:bg-dark-600 dark:hover:border-dark-500'
       ],
       secondary: [
-        'bg-gradient-to-r from-purple-600 to-purple-700 text-white hover:from-purple-700 hover:to-purple-800',
-        'shadow-lg shadow-purple-500/25 hover:shadow-purple-500/30'
+        'bg-primary-600 text-white hover:bg-primary-700',
+        'dark:bg-primary-500 dark:hover:bg-primary-600',
+        'shadow-sm hover:shadow-md'
       ],
       ghost: [
-        'hover:bg-gray-100 hover:text-gray-900',
-        'dark:hover:bg-gray-800 dark:hover:text-gray-100'
+        'text-gray-600 hover:bg-gray-100 hover:text-gray-900',
+        'dark:text-gray-400 dark:hover:bg-dark-700 dark:hover:text-gray-100'
       ],
       link: [
-        'text-blue-600 underline-offset-4 hover:underline',
-        'dark:text-blue-400'
+        'text-primary-600 hover:text-primary-700 underline-offset-4 hover:underline',
+        'dark:text-primary-400 dark:hover:text-primary-300'
       ],
       buzz: [
-        'bg-gradient-to-r from-red-500 to-red-600 text-white hover:from-red-600 hover:to-red-700',
-        'shadow-[0_12px_0_#dc2626,0_14px_20px_rgba(0,0,0,0.4)] hover:shadow-[0_10px_0_#dc2626,0_12px_20px_rgba(0,0,0,0.4)]',
-        'active:transform active:translate-y-2 active:shadow-[0_0_0_#dc2626,0_0_0_rgba(0,0,0,0.3)]',
-        'disabled:bg-gradient-to-r disabled:from-gray-400 disabled:to-gray-500',
-        'disabled:shadow-[0_6px_0_#9ca3af,0_8px_10px_rgba(0,0,0,0.1)]',
-        'touch-manipulation select-none'
+        'bg-red-600 text-white hover:bg-red-700',
+        'shadow-[0_8px_0_#dc2626] hover:shadow-[0_6px_0_#dc2626]',
+        'active:transform active:translate-y-2 active:shadow-[0_0_0_#dc2626]',
+        'disabled:bg-gray-400 disabled:shadow-[0_4px_0_#9ca3af]',
+        'dark:disabled:bg-gray-600 dark:disabled:shadow-[0_4px_0_#4b5563]',
+        'touch-manipulation select-none rounded-2xl'
       ]
     };
 

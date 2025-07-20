@@ -13,9 +13,10 @@ export function Header({ title, subtitle, className, children }: HeaderProps) {
     <header
       className={cn(
         'bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900',
-        'backdrop-blur-md border-b border-white/10',
-        'text-white px-6 py-4 sticky top-0 z-50',
-        'shadow-xl shadow-slate-900/20',
+        'dark:from-dark-900 dark:via-dark-800 dark:to-dark-900',
+        'backdrop-blur-md border-b border-white/10 dark:border-dark-700',
+        'text-white dark:text-gray-100 px-6 py-4 sticky top-0 z-50',
+        'shadow-xl shadow-slate-900/20 dark:shadow-dark-900/40',
         className
       )}
     >
@@ -25,7 +26,7 @@ export function Header({ title, subtitle, className, children }: HeaderProps) {
             {title}
           </h1>
           {subtitle && (
-            <p className="text-slate-300 text-sm mt-1 font-medium">
+            <p className="text-slate-300 dark:text-gray-400 text-sm mt-1 font-medium">
               {subtitle}
             </p>
           )}

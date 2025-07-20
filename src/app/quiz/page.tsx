@@ -7,7 +7,7 @@ export default function QuizPage() {
   const router = useRouter();
 
   useEffect(() => {
-    router.replace('/quiz/host');
+    router.replace('/quiz/setup');
   }, [router]);
 
   return null;

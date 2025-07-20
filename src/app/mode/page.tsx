@@ -4,142 +4,132 @@ import React from 'react';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
-import { Header } from '@/components/layout/Header';
 
 export default function ModeSelectionPage() {
   return (
-    <div className="min-h-screen flex flex-col">
-      <Header 
-        title="Quiz & Polling Platform" 
-        subtitle="Choose your activity mode"
-      />
+    <div className="min-h-screen bg-gray-50 dark:bg-dark-900 dark">
+      {/* Header */}
+      <header className="border-b border-gray-200 dark:border-dark-700 bg-white dark:bg-dark-800">
+        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center">
+          <Link href="/" className="text-xl font-semibold text-gray-900 dark:text-gray-100 hover:text-gray-700 dark:hover:text-gray-300">
+            Quiz Buzzer
+          </Link>
+        </div>
+      </header>
       
-      <main className="flex-1 flex items-center justify-center p-6">
+      {/* Main Content */}
+      <main className="flex items-center justify-center min-h-[calc(100vh-80px)] px-6">
         <div className="w-full max-w-4xl">
           <div className="text-center mb-12">
-            <h1 className="text-4xl md:text-6xl font-bold text-white mb-6">
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-4">
               Choose Your Mode
             </h1>
-            <p className="text-xl text-slate-300 max-w-2xl mx-auto">
-              Select the type of interactive experience you want to create or join.
+            <p className="text-lg text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
+              Select the type of interactive experience you want to create
             </p>
           </div>
 
-          <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+          <div className="grid md:grid-cols-2 gap-8 max-w-3xl mx-auto">
             {/* Quiz Mode Card */}
-            <Card className="bg-white/10 backdrop-blur border-white/20 hover:bg-white/15 transition-all duration-200 hover:scale-105">
+            <Card className="hover:shadow-lg transition-shadow duration-200">
               <CardHeader className="text-center">
-                <div className="text-6xl mb-4">🎯</div>
-                <CardTitle className="text-white text-3xl">Quiz Mode</CardTitle>
+                <div className="w-16 h-16 bg-primary-100 dark:bg-primary-900/30 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                  <span className="text-2xl">🎯</span>
+                </div>
+                <CardTitle className="text-xl text-gray-900 dark:text-gray-100">Quiz Competition</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <p className="text-slate-300 text-center text-lg">
-                  Interactive trivia competition with real-time buzzers, scoring, and team rankings.
+              <CardContent className="space-y-6">
+                <p className="text-gray-600 dark:text-gray-400 text-center">
+                  Interactive trivia competition with real-time buzzers and scoring
                 </p>
-                <div className="space-y-3 text-sm text-slate-400">
+                <div className="space-y-3">
                   <div className="flex items-center space-x-3">
-                    <span className="text-green-400">✅</span>
-                    <span>13 engaging trivia questions</span>
+                    <div className="w-2 h-2 bg-primary-500 dark:bg-primary-400 rounded-full"></div>
+                    <span className="text-sm text-gray-700 dark:text-gray-300">13 engaging trivia questions</span>
                   </div>
                   <div className="flex items-center space-x-3">
-                    <span className="text-green-400">✅</span>
-                    <span>Lightning-fast buzzer system</span>
+                    <div className="w-2 h-2 bg-primary-500 dark:bg-primary-400 rounded-full"></div>
+                    <span className="text-sm text-gray-700 dark:text-gray-300">Lightning-fast buzzer system</span>
                   </div>
                   <div className="flex items-center space-x-3">
-                    <span className="text-green-400">✅</span>
-                    <span>Real-time scoring & rankings</span>
+                    <div className="w-2 h-2 bg-primary-500 dark:bg-primary-400 rounded-full"></div>
+                    <span className="text-sm text-gray-700 dark:text-gray-300">Real-time scoring & rankings</span>
                   </div>
                   <div className="flex items-center space-x-3">
-                    <span className="text-green-400">✅</span>
-                    <span>Interactive answer reveals</span>
-                  </div>
-                  <div className="flex items-center space-x-3">
-                    <span className="text-green-400">✅</span>
-                    <span>Mobile-optimized experience</span>
+                    <div className="w-2 h-2 bg-primary-500 dark:bg-primary-400 rounded-full"></div>
+                    <span className="text-sm text-gray-700 dark:text-gray-300">Mobile-optimized experience</span>
                   </div>
                 </div>
                 <Link href="/quiz" className="block">
-                  <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white text-lg py-3">
-                    🎮 Enter Quiz Mode
+                  <Button className="w-full" size="lg">
+                    Start Quiz
                   </Button>
                 </Link>
               </CardContent>
             </Card>
 
             {/* Polling Mode Card */}
-            <Card className="bg-white/10 backdrop-blur border-white/20 hover:bg-white/15 transition-all duration-200 hover:scale-105">
+            <Card className="hover:shadow-lg transition-shadow duration-200">
               <CardHeader className="text-center">
-                <div className="text-6xl mb-4">🗳️</div>
-                <CardTitle className="text-white text-3xl">Live Polling</CardTitle>
+                <div className="w-16 h-16 bg-primary-100 dark:bg-primary-900/30 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                  <span className="text-2xl">🗳️</span>
+                </div>
+                <CardTitle className="text-xl text-gray-900 dark:text-gray-100">Live Polling</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <p className="text-slate-300 text-center text-lg">
-                  Create instant polls with custom questions and see real-time audience responses.
+              <CardContent className="space-y-6">
+                <p className="text-gray-600 dark:text-gray-400 text-center">
+                  Create instant polls with custom questions and real-time responses
                 </p>
-                <div className="space-y-3 text-sm text-slate-400">
+                <div className="space-y-3">
                   <div className="flex items-center space-x-3">
-                    <span className="text-green-400">✅</span>
-                    <span>Custom question creation</span>
+                    <div className="w-2 h-2 bg-primary-500 dark:bg-primary-400 rounded-full"></div>
+                    <span className="text-sm text-gray-700 dark:text-gray-300">Custom question creation</span>
                   </div>
                   <div className="flex items-center space-x-3">
-                    <span className="text-green-400">✅</span>
-                    <span>Up to 6 answer options</span>
+                    <div className="w-2 h-2 bg-primary-500 dark:bg-primary-400 rounded-full"></div>
+                    <span className="text-sm text-gray-700 dark:text-gray-300">Up to 6 answer options</span>
                   </div>
                   <div className="flex items-center space-x-3">
-                    <span className="text-green-400">✅</span>
-                    <span>Live result visualization</span>
+                    <div className="w-2 h-2 bg-primary-500 dark:bg-primary-400 rounded-full"></div>
+                    <span className="text-sm text-gray-700 dark:text-gray-300">Live result visualization</span>
                   </div>
                   <div className="flex items-center space-x-3">
-                    <span className="text-green-400">✅</span>
-                    <span>Instant audience feedback</span>
-                  </div>
-                  <div className="flex items-center space-x-3">
-                    <span className="text-green-400">✅</span>
-                    <span>Real-time vote tracking</span>
+                    <div className="w-2 h-2 bg-primary-500 dark:bg-primary-400 rounded-full"></div>
+                    <span className="text-sm text-gray-700 dark:text-gray-300">Real-time vote tracking</span>
                   </div>
                 </div>
                 <Link href="/polling" className="block">
-                  <Button className="w-full bg-purple-600 hover:bg-purple-700 text-white text-lg py-3">
-                    📊 Enter Polling Mode
+                  <Button variant="secondary" className="w-full" size="lg">
+                    Start Polling
                   </Button>
                 </Link>
               </CardContent>
             </Card>
           </div>
 
-          {/* Features Comparison */}
+          {/* Use Cases */}
           <div className="mt-16 text-center">
-            <h2 className="text-2xl font-bold text-white mb-8">Perfect for Any Event</h2>
-            <div className="grid md:grid-cols-3 gap-6">
-              <div className="bg-white/5 rounded-lg p-6 backdrop-blur">
-                <div className="text-3xl mb-4">🏢</div>
-                <h3 className="text-lg font-semibold text-white mb-2">Corporate Events</h3>
-                <p className="text-slate-400 text-sm">
-                  Team building, training sessions, and company meetings
-                </p>
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-8">Perfect for Any Event</h2>
+            <div className="grid md:grid-cols-3 gap-6 max-w-2xl mx-auto">
+              <div className="space-y-2">
+                <div className="text-2xl">🏢</div>
+                <h3 className="font-medium text-gray-900 dark:text-gray-100">Corporate</h3>
+                <p className="text-gray-500 dark:text-gray-400 text-sm">Team building & training</p>
               </div>
-              <div className="bg-white/5 rounded-lg p-6 backdrop-blur">
-                <div className="text-3xl mb-4">🎓</div>
-                <h3 className="text-lg font-semibold text-white mb-2">Education</h3>
-                <p className="text-slate-400 text-sm">
-                  Classroom engagement, quizzes, and student feedback
-                </p>
+              <div className="space-y-2">
+                <div className="text-2xl">🎓</div>
+                <h3 className="font-medium text-gray-900 dark:text-gray-100">Education</h3>
+                <p className="text-gray-500 dark:text-gray-400 text-sm">Classroom engagement</p>
               </div>
-              <div className="bg-white/5 rounded-lg p-6 backdrop-blur">
-                <div className="text-3xl mb-4">🎉</div>
-                <h3 className="text-lg font-semibold text-white mb-2">Entertainment</h3>
-                <p className="text-slate-400 text-sm">
-                  Parties, social events, and friendly competitions
-                </p>
+              <div className="space-y-2">
+                <div className="text-2xl">🎉</div>
+                <h3 className="font-medium text-gray-900 dark:text-gray-100">Entertainment</h3>
+                <p className="text-gray-500 dark:text-gray-400 text-sm">Parties & events</p>
               </div>
             </div>
           </div>
         </div>
       </main>
-
-      <footer className="text-center py-6 text-slate-400">
-        <p>&copy; 2024 Quiz & Polling Platform. Built with Next.js & Socket.io</p>
-      </footer>
     </div>
   );
 }

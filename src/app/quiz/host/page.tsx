@@ -1,17 +1,19 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Header } from '@/components/layout/Header';
 import { ConnectionStatus } from '@/components/layout/ConnectionStatus';
 import { QuestionDisplay } from '@/components/quiz/QuestionDisplay';
-import { QuizControls } from '@/components/quiz/QuizControls';
 import { ScoreBoard } from '@/components/quiz/ScoreBoard';
 import { ParticipantList } from '@/components/quiz/ParticipantList';
 import { SharePanel } from '@/components/ui/SharePanel';
+import { Button } from '@/components/ui/Button';
 import { useSocket } from '@/hooks/useSocket';
 import { useQuizState } from '@/hooks/useQuizState';
 
 export default function HostPage() {
+  const router = useRouter();
   const { socket, connectionStatus } = useSocket();
   const {
     quizState,
@@ -28,6 +30,17 @@ export default function HostPage() {
 
   useEffect(() => {
     if (!socket) return;
+
+    // Send custom questions to server on connection
+    const customQuestions = sessionStorage.getItem('customQuestions');
+    if (customQuestions) {
+      try {
+        const questions = JSON.parse(customQuestions);
+        socket.emit('set-custom-questions', { questions });
+      } catch (e) {
+        console.error('Error parsing custom questions:', e);
+      }
+    }
 
     // Socket event listeners
     socket.on('register-team', (data) => {
@@ -86,6 +99,11 @@ export default function HostPage() {
       } else {
         setHighlightedOption(null);
         setRevealedAnswer(correctIndex);
+        
+        // Only emit final answer to participants (no animation)
+        if (socket) {
+          socket.emit('answer-revealed', { revealedAnswer: correctIndex });
+        }
       }
     };
 
@@ -106,50 +124,63 @@ export default function HostPage() {
     }
   };
 
+  const handleExitQuiz = () => {
+    if (confirm('Are you sure you want to exit the quiz? This will end the session for all participants.')) {
+      if (socket) {
+        socket.emit('host-exit-quiz');
+      }
+      // Clear custom questions from storage
+      sessionStorage.removeItem('customQuestions');
+      // Redirect to mode selection
+      router.push('/mode');
+    }
+  };
+
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col bg-gray-50 dark:bg-dark-900 dark">
       <Header 
         title="Quiz Host Control Panel" 
         subtitle={`Question ${quizState.currentQuestion} of ${quizState.totalQuestions}`}
       >
-        <ConnectionStatus status={connectionStatus} />
+        <div className="flex items-center space-x-4">
+          <ConnectionStatus status={connectionStatus} />
+          <Button
+            onClick={handleExitQuiz}
+            variant="destructive"
+            size="sm"
+          >
+            Exit Quiz
+          </Button>
+        </div>
       </Header>
 
-      <main className="flex-1 p-6">
+      <main className="flex-1 p-6 bg-gray-50 dark:bg-dark-900">
         <div className="max-w-7xl mx-auto">
-          <div className="grid lg:grid-cols-4 gap-6">
-            {/* Left Column - Question & Controls */}
-            <div className="lg:col-span-2 space-y-6">
+          <div className="grid lg:grid-cols-3 gap-6">
+            {/* Left Column - Question */}
+            <div className="lg:col-span-2">
               <QuestionDisplay
                 questionNumber={quizState.currentQuestion}
+                totalQuestions={quizState.totalQuestions}
                 question={quizState.currentQuestionData}
                 isHost={true}
                 revealedAnswer={revealedAnswer}
                 highlightedOption={highlightedOption}
-              />
-
-              <QuizControls
-                currentQuestion={quizState.currentQuestion}
-                totalQuestions={quizState.totalQuestions}
-                questionData={quizState.currentQuestionData}
                 onQuestionChange={handleQuestionChange}
                 onRevealAnswer={handleRevealAnswer}
-                onResetBuzzer={handleResetBuzzer}
               />
             </div>
 
-            {/* Right Column - Scores & Rankings */}
+            {/* Right Column - Scores, Rankings & Invite (Vertical) */}
             <div className="space-y-6">
               <ScoreBoard scores={quizState.scores} />
               
               <ParticipantList 
                 rankings={quizState.rankings}
                 onAddPoint={handleAddPoint}
+                onResetBuzzer={handleResetBuzzer}
               />
-            </div>
 
-            {/* Share Panel */}
-            <div className="space-y-6">
               <SharePanel
                 joinPath="/quiz/join"
                 title="Invite Players"

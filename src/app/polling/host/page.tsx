@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { io, Socket } from 'socket.io-client';
 import { Button } from '@/components/ui/Button';
+import { Card } from '@/components/ui/Card';
 import { Header } from '@/components/layout/Header';
 import { SharePanel } from '@/components/ui/SharePanel';
 import { PollCreator } from '@/components/polling/PollCreator';
@@ -103,41 +104,43 @@ export default function PollingHostPage() {
   const hasActivePoll = currentPoll?.isActive;
 
   return (
-    <div className="min-h-screen flex flex-col">
-      <Header 
-        title="Polling Host Console" 
-        subtitle={isConnected ? "Connected - Ready to create polls" : "Connecting..."}
-      >
-        <div className="flex items-center space-x-2">
-          <div className={`w-3 h-3 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`} />
-          <span className="text-sm text-white/80">
-            {isConnected ? 'Connected' : 'Connecting...'}
-          </span>
-          <Link href="/polling">
-            <Button variant="outline" size="sm">
-              ← Back to Polling
-            </Button>
-          </Link>
+    <div className="min-h-screen bg-gray-50 dark:bg-dark-900 dark">
+      {/* Header */}
+      <header className="border-b border-gray-200 dark:border-dark-700 bg-white dark:bg-dark-800">
+        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+          <div className="flex items-center space-x-4">
+            <Link href="/mode" className="text-xl font-semibold text-gray-900 dark:text-gray-100 hover:text-gray-700 dark:hover:text-gray-300">
+              Quiz Buzzer
+            </Link>
+            <div className="text-gray-400 dark:text-gray-600">→</div>
+            <span className="text-gray-600 dark:text-gray-400">Polling Host</span>
+          </div>
+          <div className="flex items-center space-x-3">
+            <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`} />
+            <span className="text-sm text-gray-600 dark:text-gray-400">
+              {isConnected ? 'Connected' : 'Connecting...'}
+            </span>
+          </div>
         </div>
-      </Header>
+      </header>
       
       <main className="flex-1 p-6">
         <div className="max-w-7xl mx-auto">
           {/* Welcome Section */}
           {!currentPoll && !showCreator && (
             <div className="text-center mb-8">
-              <h1 className="text-4xl font-bold text-white mb-4">
-                🗳️ Host Live Polling Session
+              <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-4">
+                Host Live Polling Session
               </h1>
-              <p className="text-xl text-slate-300 mb-8">
+              <p className="text-lg text-gray-600 dark:text-gray-400 mb-8 max-w-2xl mx-auto">
                 Create engaging polls and see real-time audience responses
               </p>
               <Button
                 onClick={handleNewPoll}
-                className="bg-purple-600 hover:bg-purple-700 text-white px-8 py-3 text-lg"
+                size="lg"
                 disabled={!isConnected}
               >
-                📊 Create Your First Poll
+                Create Your First Poll
               </Button>
             </div>
           )}
@@ -146,7 +149,7 @@ export default function PollingHostPage() {
           {showCreator && (
             <div className="mb-8">
               <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold text-white">Create New Poll</h2>
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Create New Poll</h2>
                 <Button
                   onClick={() => setShowCreator(false)}
                   variant="outline"
@@ -185,15 +188,15 @@ export default function PollingHostPage() {
                     showParticipants={showResults}
                   />
                 ) : (
-                  <div className="bg-white/10 backdrop-blur border border-white/20 rounded-lg p-8 text-center">
+                  <Card className="p-8 text-center">
                     <div className="text-4xl mb-4">⏳</div>
-                    <h3 className="text-xl font-semibold text-white mb-2">
+                    <h3 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-2">
                       Waiting for votes...
                     </h3>
-                    <p className="text-slate-300">
+                    <p className="text-gray-600 dark:text-gray-400">
                       Use the share panel on the right to invite participants to join your poll
                     </p>
-                  </div>
+                  </Card>
                 )}
               </div>
 
@@ -211,24 +214,24 @@ export default function PollingHostPage() {
           {/* Instructions */}
           {!currentPoll && !showCreator && (
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mt-12">
-              <div className="bg-white/5 rounded-lg p-6 backdrop-blur">
+              <div className="bg-white/5 dark:bg-dark-800/50 rounded-lg p-6 backdrop-blur border border-gray-200 dark:border-dark-700">
                 <div className="text-3xl mb-4">1️⃣</div>
-                <h3 className="text-lg font-semibold text-white mb-2">Create Poll</h3>
-                <p className="text-slate-400 text-sm">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">Create Poll</h3>
+                <p className="text-gray-600 dark:text-gray-400 text-sm">
                   Write your question and add 2-6 answer options for participants to choose from
                 </p>
               </div>
-              <div className="bg-white/5 rounded-lg p-6 backdrop-blur">
+              <div className="bg-white/5 dark:bg-dark-800/50 rounded-lg p-6 backdrop-blur border border-gray-200 dark:border-dark-700">
                 <div className="text-3xl mb-4">2️⃣</div>
-                <h3 className="text-lg font-semibold text-white mb-2">Share Link</h3>
-                <p className="text-slate-400 text-sm">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">Share Link</h3>
+                <p className="text-gray-600 dark:text-gray-400 text-sm">
                   Participants join at /polling/join to vote on your live polls
                 </p>
               </div>
-              <div className="bg-white/5 rounded-lg p-6 backdrop-blur">
+              <div className="bg-white/5 dark:bg-dark-800/50 rounded-lg p-6 backdrop-blur border border-gray-200 dark:border-dark-700">
                 <div className="text-3xl mb-4">3️⃣</div>
-                <h3 className="text-lg font-semibold text-white mb-2">View Results</h3>
-                <p className="text-slate-400 text-sm">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">View Results</h3>
+                <p className="text-gray-600 dark:text-gray-400 text-sm">
                   Watch real-time results and control when to show them to participants
                 </p>
               </div>
