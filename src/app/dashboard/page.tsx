@@ -27,10 +27,7 @@ export default function DashboardPage() {
   useEffect(() => {
     if (!authLoading && !user) {
       router.push('/auth/login');
-      return;
-    }
-
-    if (user) {
+    } else if (user) {
       loadTemplates();
     }
   }, [user, authLoading, router]);
