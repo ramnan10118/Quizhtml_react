@@ -13,6 +13,7 @@ interface Template {
   description: string | null;
   type: 'quiz' | 'poll';
   status: 'draft' | 'live' | 'completed';
+  content: Record<string, unknown>;
   created_at: string;
   updated_at: string;
 }
@@ -53,6 +54,45 @@ export default function DashboardPage() {
     router.push('/');
   };
 
+  const handleViewTemplate = (template: Template) => {
+    if (template.type === 'quiz') {
+      // Load quiz data into localStorage and go to quiz setup page for editing
+      const content = template.content as { questions: unknown[] };
+      localStorage.setItem('quiz-setup-questions', JSON.stringify(content.questions || []));
+      localStorage.setItem('template-title', template.title);
+      localStorage.setItem('template-description', template.description || '');
+      localStorage.setItem('current-template-id', template.id);
+      router.push('/quiz/setup');
+    } else if (template.type === 'poll') {
+      // For polls, go to poll creation page
+      router.push('/polling');
+    }
+  };
+
+  const handleDeleteTemplate = async (template: Template) => {
+    const confirmDelete = window.confirm(`Are you sure you want to delete "${template.title}"? This action cannot be undone.`);
+    
+    if (!confirmDelete) return;
+
+    try {
+      const response = await fetch(`/api/templates/${template.id}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || errorData.details || 'Failed to delete template');
+      }
+
+      // Remove from local state to update UI immediately
+      setTemplates(prev => prev.filter(t => t.id !== template.id));
+      setError(''); // Clear any previous errors
+      
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Failed to delete template');
+    }
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'live': return 'bg-green-100 text-green-800 border-green-200';
@@ -84,7 +124,7 @@ export default function DashboardPage() {
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-                Welcome back, {String(profile?.full_name || user?.email || 'User')}! 👋
+                Welcome back, {profile?.full_name || user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'User'}! 👋
               </h1>
               <p className="text-gray-600 dark:text-gray-400 mt-1">
                 Manage your quizzes and polls from your dashboard
@@ -122,101 +162,11 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {/* Stats Overview */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <span className="text-2xl">📊</span>
-                </div>
-                <div className="ml-3">
-                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Total Templates</p>
-                  <p className="text-2xl font-semibold text-gray-900 dark:text-gray-100">
-                    {templates.length}
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <span className="text-2xl">🟢</span>
-                </div>
-                <div className="ml-3">
-                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Live Now</p>
-                  <p className="text-2xl font-semibold text-gray-900 dark:text-gray-100">
-                    {templates.filter(t => t.status === 'live').length}
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <span className="text-2xl">📝</span>
-                </div>
-                <div className="ml-3">
-                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Drafts</p>
-                  <p className="text-2xl font-semibold text-gray-900 dark:text-gray-100">
-                    {templates.filter(t => t.status === 'draft').length}
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <span className="text-2xl">✅</span>
-                </div>
-                <div className="ml-3">
-                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Completed</p>
-                  <p className="text-2xl font-semibold text-gray-900 dark:text-gray-100">
-                    {templates.filter(t => t.status === 'completed').length}
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
 
         {/* Templates List */}
         <Card>
           <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle>Your Templates</CardTitle>
-              <div className="flex space-x-2">
-                <Button
-                  onClick={() => router.push('/templates')}
-                  variant="outline"
-                  size="sm"
-                >
-                  📁 View All
-                </Button>
-                <Button
-                  onClick={() => router.push('/quiz/setup')}
-                  size="sm"
-                >
-                  📝 New Quiz
-                </Button>
-                <Button
-                  onClick={() => router.push('/polling')}
-                  variant="outline"
-                  size="sm"
-                >
-                  📊 New Poll
-                </Button>
-              </div>
-            </div>
+            <CardTitle>Your Templates</CardTitle>
           </CardHeader>
           <CardContent>
             {templates.length === 0 ? (
@@ -274,8 +224,20 @@ export default function DashboardPage() {
                       <span className={`px-2 py-1 text-xs font-medium rounded border ${getStatusColor(template.status)}`}>
                         {template.status.charAt(0).toUpperCase() + template.status.slice(1)}
                       </span>
-                      <Button size="sm" variant="outline">
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        onClick={() => handleViewTemplate(template)}
+                      >
                         View
+                      </Button>
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        onClick={() => handleDeleteTemplate(template)}
+                        className="text-red-600 border-red-300 hover:bg-red-50"
+                      >
+                        🗑️
                       </Button>
                     </div>
                   </div>

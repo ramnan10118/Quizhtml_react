@@ -52,23 +52,59 @@ export default function QuizSetupPage() {
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [reorderingIndex, setReorderingIndex] = useState<number | null>(null);
   const [isAnimating, setIsAnimating] = useState(false);
+  
 
   const topicSuggestions = [
     'History', 'Science', 'Technology', 'Geography', 'Literature',
     'Movies & Entertainment', 'Sports', 'Art & Culture', 'Music', 'General Knowledge'
   ];
 
-  // Load questions from localStorage on component mount
+  // Load questions and template data on component mount
   useEffect(() => {
-    const savedQuestions = localStorage.getItem('quiz-setup-questions');
-    if (savedQuestions) {
-      try {
-        const parsedQuestions = JSON.parse(savedQuestions);
-        setQuestions(parsedQuestions);
-      } catch (error) {
-        console.error('Failed to parse saved questions:', error);
+    // Check if we're loading an existing template (only load if template data exists)
+    const existingTitle = localStorage.getItem('template-title');
+    const existingDescription = localStorage.getItem('template-description');
+    const existingTemplateId = localStorage.getItem('current-template-id');
+    
+    // Only load questions if we're actually editing an existing template
+    const isEditingTemplate = existingTitle || existingDescription || existingTemplateId;
+    
+    if (isEditingTemplate) {
+      const existingQuestions = localStorage.getItem('quiz-setup-questions');
+      
+      if (existingQuestions) {
+        try {
+          const parsedQuestions = JSON.parse(existingQuestions);
+          setQuestions(parsedQuestions);
+        } catch (error) {
+          console.error('Failed to parse saved questions:', error);
+        }
       }
+
+      if (existingTitle) {
+        setTemplateTitle(existingTitle);
+        localStorage.removeItem('template-title'); // Clean up after loading
+      }
+
+      if (existingDescription) {
+        setTemplateDescription(existingDescription);
+        localStorage.removeItem('template-description'); // Clean up after loading
+      }
+
+      if (existingTemplateId) {
+        setCurrentTemplateId(existingTemplateId);
+        localStorage.removeItem('current-template-id'); // Clean up after loading
+      }
+    } else {
+      // If not editing a template, clear any old localStorage data for fresh start
+      localStorage.removeItem('quiz-setup-questions');
+      localStorage.removeItem('template-title');
+      localStorage.removeItem('template-description');
+      localStorage.removeItem('current-template-id');
     }
+
+    // Clear sessionStorage for fresh start
+    sessionStorage.removeItem('customQuestions');
     setIsLoaded(true);
   }, []);
 
@@ -282,6 +318,7 @@ export default function QuizSetupPage() {
       setIsSaving(false);
     }
   };
+
 
   const handleLaunchQuiz = () => {
     sessionStorage.setItem('customQuestions', JSON.stringify(questions));

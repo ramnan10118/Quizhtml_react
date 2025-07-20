@@ -2,10 +2,30 @@ import { google } from 'googleapis';
 
 // Initialize Google Sheets client
 const getGoogleSheetsClient = () => {
+  let privateKey = process.env.GOOGLE_PRIVATE_KEY;
+  
+  if (!privateKey) {
+    throw new Error('GOOGLE_PRIVATE_KEY environment variable is not set');
+  }
+  
+  // Handle different possible formats
+  if (privateKey.includes('\\n')) {
+    privateKey = privateKey.replace(/\\n/g, '\n');
+  }
+  
+  // Ensure proper format
+  if (!privateKey.includes('-----BEGIN PRIVATE KEY-----')) {
+    throw new Error('Invalid private key format - missing BEGIN marker');
+  }
+  
+  if (!privateKey.includes('-----END PRIVATE KEY-----')) {
+    throw new Error('Invalid private key format - missing END marker');
+  }
+
   const auth = new google.auth.GoogleAuth({
     credentials: {
       client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
-      private_key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+      private_key: privateKey,
     },
     scopes: ['https://www.googleapis.com/auth/spreadsheets'],
   });
