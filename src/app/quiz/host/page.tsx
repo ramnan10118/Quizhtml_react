@@ -36,7 +36,7 @@ export default function HostPage() {
     if (customQuestions) {
       try {
         const questions = JSON.parse(customQuestions);
-        socket.emit('set-custom-questions', { questions });
+        (socket as any).emit('set-custom-questions', { questions });
       } catch (e) {
         console.error('Error parsing custom questions:', e);
       }
@@ -79,7 +79,8 @@ export default function HostPage() {
   const handleRevealAnswer = () => {
     if (!quizState.currentQuestionData) return;
 
-    const correctIndex = quizState.currentQuestionData.correct;
+    const correctIndex = quizState.currentQuestionData?.correct;
+    if (correctIndex === undefined) return;
     let cycleCount = 0;
     let currentIndex = 0;
     let speed = 100;

@@ -62,6 +62,8 @@ export interface ServerToClientEvents {
   'register-team': (data: TeamData) => void;
   'disconnect-team': (socketId: string) => void;
   'celebrate': (data: CelebrationData) => void;
+  'answer-revealed': (data: { revealedAnswer: number }) => void;
+  'quiz-ended': (data: { message: string }) => void;
 }
 
 export interface ClientToServerEvents {
@@ -71,6 +73,9 @@ export interface ClientToServerEvents {
   'register-team': (data: { teamName: string }) => void;
   'trigger-celebration': (data: { teamName: string }) => void;
   'request-question-number': () => void;
+  'set-custom-questions': (data: { questions: QuizQuestion[] }) => void;
+  'answer-revealed': (data: { revealedAnswer: number }) => void;
+  'host-exit-quiz': () => void;
 }
 
 export interface InterServerEvents {

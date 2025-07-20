@@ -72,7 +72,7 @@ export default function JoinPage() {
       connectionChange();
     });
 
-    socket.on('answer-revealed', (data) => {
+    socket.on('answer-revealed', (data: { revealedAnswer: number }) => {
       if (data.revealedAnswer !== undefined && data.revealedAnswer !== null) {
         setRevealedAnswer(data.revealedAnswer);
       }
@@ -106,7 +106,7 @@ export default function JoinPage() {
     });
 
     // Handle quiz ended by host
-    socket.on('quiz-ended', (data) => {
+    socket.on('quiz-ended', (data: { message: string }) => {
       alert(data.message);
       // Clear participant data
       setTeamName('');
