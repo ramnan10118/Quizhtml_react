@@ -1,0 +1,129 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+  min-height: 100vh;
+  background: #fafafa;
+  color: #111827;
+  margin: 0;
+  padding: 0;
+  touch-action: manipulation;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* Dark theme styles */
+.dark {
+  color-scheme: dark;
+}
+
+.dark body {
+  background: #0f172a;
+  color: #f1f5f9;
+}
+
+/* Dark theme scrollbar */
+.dark ::-webkit-scrollbar {
+  width: 8px;
+}
+
+.dark ::-webkit-scrollbar-track {
+  background: #1e293b;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: #475569;
+  border-radius: 4px;
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: #64748b;
+}
+
+/* Form controls in dark theme */
+.dark select,
+.dark input[type="range"] {
+  background-color: #334155;
+  border-color: #475569;
+  color: #f1f5f9;
+}
+
+.dark select:focus,
+.dark input[type="range"]:focus {
+  border-color: #3b82f6;
+  outline: none;
+}
+
+/* Range slider thumb styling for dark theme */
+.dark input[type="range"]::-webkit-slider-thumb {
+  background: #3b82f6;
+  border: 2px solid #1e293b;
+}
+
+.dark input[type="range"]::-moz-range-thumb {
+  background: #3b82f6;
+  border: 2px solid #1e293b;
+}
+
+/* Custom animations for celebration */
+.celebrating {
+  animation: celebrationBg 2s ease-in-out, celebrationPulse 0.5s ease-in-out 4;
+}
+
+.point-gained {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(255, 255, 255, 0.95);
+  padding: 20px 40px;
+  border-radius: 15px;
+  font-size: 24px;
+  font-weight: bold;
+  color: #059669;
+  box-shadow: 0 4px 15px rgba(5, 150, 105, 0.4);
+  z-index: 1000;
+  animation: popIn 0.5s ease-out;
+  backdrop-filter: blur(10px);
+  border: 2px solid rgba(16, 185, 129, 0.3);
+}
+
+.dark .point-gained {
+  background: rgba(30, 41, 59, 0.95);
+  color: #10b981;
+  border: 2px solid rgba(16, 185, 129, 0.5);
+  box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3);
+}
+
+/* Mobile-specific optimizations */
+@media (max-width: 640px) {
+  body {
+    padding-bottom: 140px;
+  }
+}
+
+/* Touch feedback */
+button {
+  touch-action: manipulation;
+}
+
+/* Prevent zoom on inputs on iOS */
+input {
+  font-size: 16px;
+}
+
+/* Remove default button styles on mobile */
+button {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+}
