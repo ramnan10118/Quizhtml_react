@@ -11,6 +11,7 @@ import { SharePanel } from '@/components/ui/SharePanel';
 import { Button } from '@/components/ui/Button';
 import { useSocket } from '@/hooks/useSocket';
 import { useQuizState } from '@/hooks/useQuizState';
+import { ProtectedRoute } from '@/components/ProtectedRoute';
 
 export default function HostPage() {
   const router = useRouter();
@@ -138,6 +139,7 @@ export default function HostPage() {
   };
 
   return (
+    <ProtectedRoute>
     <div className="min-h-screen flex flex-col bg-gray-50 dark:bg-dark-900 dark">
       <Header 
         title="Quiz Host Control Panel" 
@@ -192,5 +194,6 @@ export default function HostPage() {
         </div>
       </main>
     </div>
+    </ProtectedRoute>
   );
 }

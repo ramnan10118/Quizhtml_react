@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { Header } from '@/components/layout/Header';
-import { ConnectionStatus } from '@/components/layout/ConnectionStatus';
+import { HamburgerMenu } from '@/components/layout/HamburgerMenu';
 import { QuestionDisplay } from '@/components/quiz/QuestionDisplay';
 import { BuzzerButton } from '@/components/quiz/BuzzerButton';
 import { useSocket } from '@/hooks/useSocket';
@@ -30,6 +30,7 @@ export default function JoinPage() {
   const [isCelebrating, setIsCelebrating] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
   const [revealedAnswer, setRevealedAnswer] = useState<number | null>(null);
+  const [teamScores, setTeamScores] = useState<{ name: string; score: number }[]>([]);
   
   const { success, error, connectionChange } = useHapticFeedback();
 
@@ -117,6 +118,11 @@ export default function JoinPage() {
       router.push('/mode');
     });
 
+    // Handle team scores updates
+    socket.on('score-update', (data) => {
+      setTeamScores(data.teams || []);
+    });
+
     // Request current question on connection
     if (isRegistered && teamName) {
       socket.emit('register-team', { teamName });
@@ -130,6 +136,7 @@ export default function JoinPage() {
       socket.off('answer-revealed');
       socket.off('celebrate');
       socket.off('quiz-ended');
+      socket.off('score-update');
     };
   }, [socket, updateCurrentQuestion, setSinglePlayerBuzzState, success, error, connectionChange, isRegistered, teamName]);
 
@@ -181,25 +188,21 @@ export default function JoinPage() {
         title="Quiz Participant" 
         subtitle={isMounted && teamName ? `Team: ${teamName}` : 'Join the Quiz'}
       >
-        <ConnectionStatus status={connectionStatus} />
-        {isRegistered && (
-          <Button
-            onClick={handleQuitSession}
-            variant="destructive"
-            size="sm"
-          >
-            Quit Session
-          </Button>
-        )}
+        <HamburgerMenu
+          connectionStatus={connectionStatus}
+          isRegistered={isRegistered}
+          onQuitSession={handleQuitSession}
+          teamScores={teamScores}
+        />
       </Header>
 
-      <main className="flex-1 flex flex-col items-center justify-center p-6 pb-32 bg-gray-50 dark:bg-dark-900">
-        <div className="w-full max-w-md space-y-6">
+      <main className="flex-1 flex flex-col items-center justify-center p-3 sm:p-6 pb-24 sm:pb-32 bg-gray-50 dark:bg-dark-900">
+        <div className="w-full max-w-lg space-y-4 sm:space-y-6">
           {!isRegistered ? (
             /* Registration Form */
             <Card className="bg-white/10 dark:bg-dark-800/50 backdrop-blur border-white/20 dark:border-dark-600">
-              <CardHeader>
-                <CardTitle className="text-gray-900 dark:text-gray-100 text-center">Join the Quiz</CardTitle>
+              <CardHeader className="pb-4">
+                <CardTitle className="text-lg sm:text-xl text-gray-900 dark:text-gray-100 text-center">Join the Quiz</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <Input
@@ -208,12 +211,12 @@ export default function JoinPage() {
                   value={inputName}
                   onChange={(e) => setInputName(e.target.value)}
                   onKeyPress={handleKeyPress}
-                  className="text-lg py-3"
+                  className="text-base sm:text-lg py-3 sm:py-4"
                   autoFocus
                 />
                 <Button
                   onClick={handleRegisterTeam}
-                  className="w-full"
+                  className="w-full py-3 sm:py-4 text-base sm:text-lg"
                   disabled={!inputName.trim()}
                 >
                   Join Quiz
@@ -234,8 +237,10 @@ export default function JoinPage() {
           {/* Status Message */}
           {statusMessage && (
             <Card className="bg-blue-100 dark:bg-blue-900/30 border-blue-300 dark:border-blue-700 text-blue-800 dark:text-blue-200">
-              <CardContent className="p-4 text-center">
-                {statusMessage}
+              <CardContent className="p-3 sm:p-4 text-center">
+                <p className="text-sm sm:text-base leading-tight sm:leading-normal">
+                  {statusMessage}
+                </p>
               </CardContent>
             </Card>
           )}

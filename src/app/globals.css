@@ -2,6 +2,30 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Custom animations */
+@keyframes fadeInOut {
+  0% {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  15% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  85% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+}
+
+.notification-fade {
+  animation: fadeInOut 2.5s ease-in-out forwards;
+}
+
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
 body {

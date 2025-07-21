@@ -25,7 +25,7 @@ export function BuzzerButton({ onBuzz, disabled = false, canBuzz = true, classNa
   return (
     <div
       className={cn(
-        'fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50',
+        'fixed bottom-4 sm:bottom-6 left-1/2 transform -translate-x-1/2 z-50',
         'touch-manipulation select-none',
         className
       )}

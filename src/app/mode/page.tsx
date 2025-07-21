@@ -4,16 +4,32 @@ import React from 'react';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
+import { ProtectedRoute } from '@/components/ProtectedRoute';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function ModeSelectionPage() {
+  const { signOut } = useAuth();
+
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+    } catch (error) {
+      console.error('Sign out error:', error);
+    }
+  };
+
   return (
+    <ProtectedRoute>
     <div className="min-h-screen bg-gray-50 dark:bg-dark-900 dark">
       {/* Header */}
       <header className="border-b border-gray-200 dark:border-dark-700 bg-white dark:bg-dark-800">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center">
+        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <Link href="/" className="text-xl font-semibold text-gray-900 dark:text-gray-100 hover:text-gray-700 dark:hover:text-gray-300">
             Quiz Buzzer
           </Link>
+          <Button onClick={handleSignOut} variant="outline" size="sm">
+            Sign Out
+          </Button>
         </div>
       </header>
       
@@ -60,7 +76,7 @@ export default function ModeSelectionPage() {
                     <span className="text-sm text-gray-700 dark:text-gray-300">Mobile-optimized experience</span>
                   </div>
                 </div>
-                <Link href="/quiz" className="block">
+                <Link href="/quiz?fresh=true" className="block">
                   <Button className="w-full" size="lg">
                     Start Quiz
                   </Button>
@@ -131,5 +147,6 @@ export default function ModeSelectionPage() {
         </div>
       </main>
     </div>
+    </ProtectedRoute>
   );
 }

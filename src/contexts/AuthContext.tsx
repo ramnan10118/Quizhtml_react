@@ -2,24 +2,17 @@
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User } from '@supabase/supabase-js';
-import { auth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 
 interface AuthContextType {
   user: User | null;
-  profile: Record<string, unknown> | null;
   loading: boolean;
+  signUp: (email: string, password: string) => Promise<void>;
+  signIn: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
-  refreshProfile: () => Promise<void>;
 }
 
-const AuthContext = createContext<AuthContextType>({
-  user: null,
-  profile: null,
-  loading: true,
-  signOut: async () => {},
-  refreshProfile: async () => {}
-});
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
@@ -31,35 +24,14 @@ export const useAuth = () => {
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [profile, setProfile] = useState<Record<string, unknown> | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Get initial session with timeout
+    // Get initial session
     const getSession = async () => {
-      try {
-        // Add a 10-second timeout to prevent infinite loading
-        const timeoutPromise = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Auth timeout')), 10000)
-        );
-        
-        const currentUser = await Promise.race([
-          auth.getCurrentUser(),
-          timeoutPromise
-        ]);
-        
-        setUser(currentUser as User | null);
-        
-        if (currentUser) {
-          await loadUserProfile((currentUser as User).id);
-        }
-      } catch (error) {
-        console.error('Error getting session:', error);
-        // If there's an error, assume no user and continue
-        setUser(null);
-      } finally {
-        setLoading(false);
-      }
+      const { data: { session } } = await supabase.auth.getSession();
+      setUser(session?.user ?? null);
+      setLoading(false);
     };
 
     getSession();
@@ -67,62 +39,49 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        if (session?.user) {
-          setUser(session.user);
-          await loadUserProfile(session.user.id);
-        } else {
-          setUser(null);
-          setProfile(null);
-        }
+        setUser(session?.user ?? null);
         setLoading(false);
       }
     );
 
     return () => subscription.unsubscribe();
-  }, []); // Empty dependency array is correct here - we only want this to run once
+  }, []);
 
-  const loadUserProfile = async (userId: string) => {
-    try {
-      // Add timeout for profile loading too
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Profile timeout')), 5000)
-      );
-      
-      const userProfile = await Promise.race([
-        auth.getUserProfile(userId),
-        timeoutPromise
-      ]);
-      
-      setProfile(userProfile as Record<string, unknown>);
-    } catch (error) {
-      console.error('Error loading profile:', error);
-      // Profile might not exist yet, that's okay - continue without it
-      setProfile(null);
+  const signUp = async (email: string, password: string) => {
+    const { error } = await supabase.auth.signUp({
+      email,
+      password,
+    });
+
+    if (error) {
+      throw error;
+    }
+  };
+
+  const signIn = async (email: string, password: string) => {
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (error) {
+      throw error;
     }
   };
 
   const signOut = async () => {
-    try {
-      await auth.signOut();
-      setUser(null);
-      setProfile(null);
-    } catch (error) {
-      console.error('Error signing out:', error);
-    }
-  };
-
-  const refreshProfile = async () => {
-    if (user) {
-      await loadUserProfile(user.id);
+    const { error } = await supabase.auth.signOut();
+    if (error) {
+      throw error;
     }
   };
 
   const value = {
     user,
-    profile,
     loading,
+    signUp,
+    signIn,
     signOut,
-    refreshProfile
   };
 
   return (

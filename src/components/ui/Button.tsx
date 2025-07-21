@@ -59,7 +59,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       sm: 'h-9 rounded-md px-3',
       lg: 'h-11 rounded-md px-8',
       icon: 'h-10 w-10',
-      buzz: 'h-20 min-w-[300px] px-8 py-4 text-2xl font-bold rounded-2xl'
+      buzz: 'h-16 sm:h-20 min-w-[250px] sm:min-w-[300px] px-6 sm:px-8 py-3 sm:py-4 text-xl sm:text-2xl font-bold rounded-2xl'
     };
 
     return (

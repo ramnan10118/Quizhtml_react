@@ -12,6 +12,7 @@ import { PollResults } from '@/components/polling/PollResults';
 import { PollControls } from '@/components/polling/PollControls';
 import { usePollState } from '@/hooks/usePollState';
 import { Poll, PollResults as PollResultsType, PollCreateData } from '@/types/polling';
+import { ProtectedRoute } from '@/components/ProtectedRoute';
 
 export default function PollingHostPage() {
   const [socket, setSocket] = useState<Socket | null>(null);
@@ -104,6 +105,7 @@ export default function PollingHostPage() {
   // const hasActivePoll = currentPoll?.isActive;
 
   return (
+    <ProtectedRoute>
     <div className="min-h-screen bg-gray-50 dark:bg-dark-900 dark">
       {/* Header */}
       <header className="border-b border-gray-200 dark:border-dark-700 bg-white dark:bg-dark-800">
@@ -240,5 +242,6 @@ export default function PollingHostPage() {
         </div>
       </main>
     </div>
+    </ProtectedRoute>
   );
 }

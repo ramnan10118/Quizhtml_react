@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { ProtectedRoute } from '@/components/ProtectedRoute';
 
 export default function PollingPage() {
   const router = useRouter();
@@ -10,5 +11,9 @@ export default function PollingPage() {
     router.replace('/polling/host');
   }, [router]);
 
-  return null;
+  return (
+    <ProtectedRoute>
+      null
+    </ProtectedRoute>
+  );
 }

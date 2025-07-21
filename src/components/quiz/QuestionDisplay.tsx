@@ -58,31 +58,31 @@ export function QuestionDisplay({
     <Card className={cn('w-full bg-gradient-to-br from-slate-50 to-slate-100 dark:from-dark-800 dark:to-dark-700 border-slate-200 dark:border-dark-600', className)}>
       <CardHeader className="pb-2">
         <div className="space-y-1">
-          <h2 className="text-2xl font-medium text-slate-700 dark:text-gray-100">
+          <h2 className="text-lg sm:text-xl md:text-2xl font-medium text-slate-700 dark:text-gray-100">
             Question {questionNumber}
           </h2>
           {totalQuestions && (
-            <p className="text-base text-slate-500 dark:text-gray-500">
+            <p className="text-sm sm:text-base text-slate-500 dark:text-gray-500">
               {questionNumber} out of {totalQuestions}
             </p>
           )}
         </div>
       </CardHeader>
       <CardContent className="space-y-6 pt-4">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-slate-900 dark:text-gray-100 leading-relaxed">
+        <div className="mb-6 sm:mb-8">
+          <h1 className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold text-slate-900 dark:text-gray-100 leading-tight sm:leading-relaxed">
             {question.text}
           </h1>
         </div>
         
         {isHost ? (
           /* Host view - with interactive boxes */
-          <div className="grid gap-3">
+          <div className="grid gap-2 sm:gap-3">
             {question.options.map((option, index) => (
               <div
                 key={index}
                 className={cn(
-                  'p-4 rounded-lg border-2 transition-all duration-200',
+                  'p-3 sm:p-4 rounded-lg border-2 transition-all duration-200',
                   'bg-white dark:bg-dark-700 hover:bg-slate-50 dark:hover:bg-dark-600',
                   'border-slate-200 dark:border-dark-600',
                   // Highlighted option (during reveal animation)
@@ -93,11 +93,11 @@ export function QuestionDisplay({
                   revealedAnswer !== null && revealedAnswer !== index && 'opacity-60'
                 )}
               >
-                <div className="flex items-center space-x-3">
+                <div className="flex items-center space-x-2 sm:space-x-3">
                   <span
                     className={cn(
-                      'flex items-center justify-center w-10 h-10 rounded-full',
-                      'bg-slate-100 dark:bg-dark-600 text-slate-700 dark:text-gray-200 font-semibold text-base',
+                      'flex items-center justify-center w-8 h-8 sm:w-10 sm:h-10 rounded-full flex-shrink-0',
+                      'bg-slate-100 dark:bg-dark-600 text-slate-700 dark:text-gray-200 font-semibold text-sm sm:text-base',
                       highlightedOption === index && 'bg-blue-200 dark:bg-blue-800 text-blue-800 dark:text-blue-200',
                       revealedAnswer === index && 'bg-green-200 dark:bg-green-800 text-green-800 dark:text-green-200'
                     )}
@@ -106,7 +106,7 @@ export function QuestionDisplay({
                   </span>
                   <span
                     className={cn(
-                      'text-lg text-slate-800 dark:text-gray-200 font-medium',
+                      'text-sm sm:text-base md:text-lg text-slate-800 dark:text-gray-200 font-medium leading-tight',
                       revealedAnswer === index && 'text-green-800 dark:text-green-200 font-semibold'
                     )}
                   >
@@ -118,12 +118,12 @@ export function QuestionDisplay({
           </div>
         ) : (
           /* Participant view - simple text display */
-          <div className="space-y-4">
+          <div className="space-y-3 sm:space-y-4">
             {question.options.map((option, index) => (
               <div
                 key={index}
                 className={cn(
-                  'flex items-center space-x-4 py-3 transition-all duration-200',
+                  'flex items-center space-x-3 sm:space-x-4 py-2 sm:py-3 transition-all duration-200',
                   // Correct answer styling
                   revealedAnswer === index && 'text-green-400 font-semibold',
                   // Dim wrong answers when revealed
@@ -132,7 +132,7 @@ export function QuestionDisplay({
               >
                 <span
                   className={cn(
-                    'flex items-center justify-center w-8 h-8 rounded-full text-sm font-semibold',
+                    'flex items-center justify-center w-7 h-7 sm:w-8 sm:h-8 rounded-full text-xs sm:text-sm font-semibold flex-shrink-0',
                     'bg-white/20 text-gray-100',
                     revealedAnswer === index && 'bg-green-400 text-green-900'
                   )}
@@ -141,7 +141,7 @@ export function QuestionDisplay({
                 </span>
                 <span 
                   className={cn(
-                    'text-lg text-gray-100 font-medium',
+                    'text-sm sm:text-base md:text-lg text-gray-100 font-medium leading-tight',
                     revealedAnswer === index && 'text-green-400 font-semibold'
                   )}
                 >

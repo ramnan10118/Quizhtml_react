@@ -8,10 +8,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { QuizQuestion } from '@/types/quiz';
-import { templates } from '@/lib/templates';
-
-
-
+import { ProtectedRoute } from '@/components/ProtectedRoute';
+import { supabase } from '@/lib/supabase';
 
 // const DEFAULT_QUESTIONS: QuizQuestion[] = [];
 
@@ -61,51 +59,59 @@ export default function QuizSetupPage() {
 
   // Load questions and template data on component mount
   useEffect(() => {
-    // Check if we're loading an existing template (only load if template data exists)
-    const existingTitle = localStorage.getItem('template-title');
-    const existingDescription = localStorage.getItem('template-description');
-    const existingTemplateId = localStorage.getItem('current-template-id');
-    
-    // Only load questions if we're actually editing an existing template
-    const isEditingTemplate = existingTitle || existingDescription || existingTemplateId;
-    
-    if (isEditingTemplate) {
-      const existingQuestions = localStorage.getItem('quiz-setup-questions');
-      
-      if (existingQuestions) {
+    const loadData = async () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const isFreshStart = urlParams.get('fresh') === 'true';
+      const templateId = urlParams.get('template');
+
+      if (isFreshStart) {
+        // Clear previous session for fresh start
+        localStorage.removeItem('quiz-setup-questions');
+        setQuestions([]);
+        setTemplateTitle('');
+        setTemplateDescription('');
+        setCurrentTemplateId(null);
+      } else if (templateId) {
+        // Load from template
         try {
-          const parsedQuestions = JSON.parse(existingQuestions);
-          setQuestions(parsedQuestions);
+          localStorage.removeItem('quiz-setup-questions'); // Clear localStorage
+          const { data, error } = await supabase
+            .from('templates')
+            .select('*')
+            .eq('id', templateId)
+            .single();
+
+          if (error) throw error;
+          
+          if (data) {
+            setQuestions(data.content.questions || []);
+            setTemplateTitle(data.title);
+            setTemplateDescription(data.description || '');
+            setCurrentTemplateId(data.id);
+            setErrorMessage(`Template "${data.title}" loaded successfully!`);
+            // Clear the success message after 2.5 seconds
+            setTimeout(() => setErrorMessage(''), 2500);
+          }
         } catch (error) {
-          console.error('Failed to parse saved questions:', error);
+          console.error('Failed to load template:', error);
+          setErrorMessage('Failed to load template. Please try again.');
+        }
+      } else {
+        // Load existing questions if not a fresh start or template load
+        const savedQuestions = localStorage.getItem('quiz-setup-questions');
+        if (savedQuestions) {
+          try {
+            const parsedQuestions = JSON.parse(savedQuestions);
+            setQuestions(parsedQuestions);
+          } catch (error) {
+            console.error('Failed to parse saved questions:', error);
+          }
         }
       }
+      setIsLoaded(true);
+    };
 
-      if (existingTitle) {
-        setTemplateTitle(existingTitle);
-        localStorage.removeItem('template-title'); // Clean up after loading
-      }
-
-      if (existingDescription) {
-        setTemplateDescription(existingDescription);
-        localStorage.removeItem('template-description'); // Clean up after loading
-      }
-
-      if (existingTemplateId) {
-        setCurrentTemplateId(existingTemplateId);
-        localStorage.removeItem('current-template-id'); // Clean up after loading
-      }
-    } else {
-      // If not editing a template, clear any old localStorage data for fresh start
-      localStorage.removeItem('quiz-setup-questions');
-      localStorage.removeItem('template-title');
-      localStorage.removeItem('template-description');
-      localStorage.removeItem('current-template-id');
-    }
-
-    // Clear sessionStorage for fresh start
-    sessionStorage.removeItem('customQuestions');
-    setIsLoaded(true);
+    loadData();
   }, []);
 
   // Save questions to localStorage whenever questions change
@@ -295,6 +301,7 @@ export default function QuizSetupPage() {
 
     try {
       const templateData = {
+        user_id: user.id,
         title: templateTitle.trim(),
         description: templateDescription.trim() || undefined,
         type: 'quiz' as const,
@@ -303,11 +310,20 @@ export default function QuizSetupPage() {
       };
 
       if (currentTemplateId) {
-        await templates.update(currentTemplateId, templateData);
+        const { error } = await supabase
+          .from('templates')
+          .update(templateData)
+          .eq('id', currentTemplateId);
+        if (error) throw error;
         setErrorMessage('Template updated successfully!');
       } else {
-        const newTemplate = await templates.create(templateData);
-        setCurrentTemplateId(newTemplate.id);
+        const { data, error } = await supabase
+          .from('templates')
+          .insert([templateData])
+          .select()
+          .single();
+        if (error) throw error;
+        setCurrentTemplateId(data.id);
         setErrorMessage('Template saved successfully!');
       }
       
@@ -325,14 +341,12 @@ export default function QuizSetupPage() {
     router.push('/quiz/host');
   };
 
-
-
-
   const isValidQuiz = questions.length >= 3 && questions.every(q => 
     q.text.trim() !== '' && q.options.every(opt => opt.trim() !== '')
   );
 
   return (
+    <ProtectedRoute>
     <div className="min-h-screen bg-gray-50 dark:bg-dark-900 dark">
       <Header 
         title="Create Quiz" 
@@ -372,7 +386,7 @@ export default function QuizSetupPage() {
                 </div>
                 {!isValidQuiz && (
                   <p className="text-xs text-red-600 dark:text-red-400 font-medium">
-                    Need at least 3 complete questions
+                    Need at least 3 complete questions to launch
                   </p>
                 )}
                 {!user && questions.length > 0 && (
@@ -388,10 +402,10 @@ export default function QuizSetupPage() {
         {errorMessage && (
           <div className={`mb-4 p-3 rounded-lg text-sm ${
             errorMessage.includes('successfully') 
-              ? 'bg-green-100 border border-green-300 text-green-700'
+              ? 'bg-green-100 border border-green-300 text-green-700 notification-fade'
               : 'bg-red-100 border border-red-300 text-red-700'
           }`}>
-            {errorMessage}
+            {errorMessage.includes('successfully') ? '✅' : ''} {errorMessage}
           </div>
         )}
 
@@ -862,6 +876,7 @@ export default function QuizSetupPage() {
         </div>
       )}
     </div>
+    </ProtectedRoute>
   );
 }
 
