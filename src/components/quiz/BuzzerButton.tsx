@@ -25,7 +25,7 @@ export function BuzzerButton({ onBuzz, disabled = false, canBuzz = true, classNa
   return (
     <div
       className={cn(
-        'fixed bottom-4 sm:bottom-6 left-1/2 transform -translate-x-1/2 z-50',
+        'fixed bottom-10 sm:bottom-12 left-1/2 transform -translate-x-1/2 z-50',
         'touch-manipulation select-none',
         className
       )}
@@ -36,8 +36,8 @@ export function BuzzerButton({ onBuzz, disabled = false, canBuzz = true, classNa
         onClick={handleBuzz}
         disabled={disabled || !canBuzz}
         className={cn(
-          'animate-pulse-slow',
-          disabled || !canBuzz ? 'animate-none opacity-60' : '',
+          'animate-pulse',
+          disabled || !canBuzz ? 'animate-none opacity-60' : 'animate-[shake_0.5s_ease-in-out_infinite]',
           'shadow-2xl shadow-red-500/40'
         )}
       >

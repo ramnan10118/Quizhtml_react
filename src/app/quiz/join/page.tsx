@@ -6,7 +6,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { Header } from '@/components/layout/Header';
-import { HamburgerMenu } from '@/components/layout/HamburgerMenu';
 import { QuestionDisplay } from '@/components/quiz/QuestionDisplay';
 import { BuzzerButton } from '@/components/quiz/BuzzerButton';
 import { useSocket } from '@/hooks/useSocket';
@@ -153,7 +152,7 @@ export default function JoinPage() {
       socket.emit('register-team', { teamName: name });
       socket.emit('request-question-number');
       success();
-      setStatusMessage(`Welcome, Team ${name}! Click the buzzer when you know the answer.`);
+      setStatusMessage('');
     }
   };
 
@@ -187,14 +186,16 @@ export default function JoinPage() {
       <Header 
         title="Quiz Participant" 
         subtitle={isMounted && teamName ? `Team: ${teamName}` : 'Join the Quiz'}
-      >
-        <HamburgerMenu
-          connectionStatus={connectionStatus}
-          isRegistered={isRegistered}
-          onQuitSession={handleQuitSession}
-          teamScores={teamScores}
-        />
-      </Header>
+      />
+      
+      {/* Welcome Message */}
+      {isRegistered && teamName && (
+        <div className="bg-blue-600 text-white px-6 py-3 text-center">
+          <p className="text-sm font-medium">
+            Welcome, Team {teamName}! Click the buzzer when you know the answer.
+          </p>
+        </div>
+      )}
 
       <main className="flex-1 flex flex-col items-center justify-center p-3 sm:p-6 pb-24 sm:pb-32 bg-gray-50 dark:bg-dark-900">
         <div className="w-full max-w-lg space-y-4 sm:space-y-6">
@@ -234,16 +235,6 @@ export default function JoinPage() {
             />
           )}
 
-          {/* Status Message */}
-          {statusMessage && (
-            <Card className="bg-blue-100 dark:bg-blue-900/30 border-blue-300 dark:border-blue-700 text-blue-800 dark:text-blue-200">
-              <CardContent className="p-3 sm:p-4 text-center">
-                <p className="text-sm sm:text-base leading-tight sm:leading-normal">
-                  {statusMessage}
-                </p>
-              </CardContent>
-            </Card>
-          )}
         </div>
       </main>
 

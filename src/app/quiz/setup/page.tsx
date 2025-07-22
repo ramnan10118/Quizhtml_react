@@ -57,7 +57,7 @@ export default function QuizSetupPage() {
     'Movies & Entertainment', 'Sports', 'Art & Culture', 'Music', 'General Knowledge'
   ];
 
-  // Load questions from draft or localStorage on component mount
+  // Load questions from draft or start fresh
   useEffect(() => {
     const loadData = async () => {
       const draftId = searchParams.get('draft');
@@ -80,16 +80,10 @@ export default function QuizSetupPage() {
           setLoadingDraft(false);
         }
       } else {
-        // Load from localStorage as fallback
-        const savedQuestions = localStorage.getItem('quiz-setup-questions');
-        if (savedQuestions) {
-          try {
-            const parsedQuestions = JSON.parse(savedQuestions);
-            setQuestions(parsedQuestions);
-          } catch (error) {
-            console.error('Failed to parse saved questions:', error);
-          }
-        }
+        // Start with empty questions for new quiz
+        setQuestions([]);
+        // Clear localStorage to prevent old questions from persisting
+        localStorage.removeItem('quiz-setup-questions');
       }
       
       setIsLoaded(true);

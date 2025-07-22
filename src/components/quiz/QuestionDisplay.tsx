@@ -70,7 +70,7 @@ export function QuestionDisplay({
       </CardHeader>
       <CardContent className="space-y-6 pt-4">
         <div className="mb-6 sm:mb-8">
-          <h1 className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold text-slate-900 dark:text-gray-100 leading-tight sm:leading-relaxed">
+          <h1 className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-bold text-slate-900 dark:text-gray-100 leading-tight sm:leading-normal md:leading-relaxed">
             {question.text}
           </h1>
         </div>
