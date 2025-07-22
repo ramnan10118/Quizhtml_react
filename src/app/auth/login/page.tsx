@@ -21,7 +21,7 @@ export default function LoginPage() {
   // Redirect if already logged in
   React.useEffect(() => {
     if (user) {
-      router.push('/mode')
+      router.push('/dashboard')
     }
   }, [user, router])
 
@@ -39,7 +39,7 @@ export default function LoginPage() {
 
     try {
       await signIn(formData.email, formData.password)
-      router.push('/mode')
+      router.push('/dashboard')
     } catch (error: unknown) {
       setError(error instanceof Error ? error.message : 'Failed to sign in')
     } finally {

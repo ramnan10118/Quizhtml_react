@@ -24,7 +24,7 @@ export default function SignUpPage() {
   // Redirect if already logged in
   React.useEffect(() => {
     if (user) {
-      router.push('/mode')
+      router.push('/dashboard')
     }
   }, [user, router])
 

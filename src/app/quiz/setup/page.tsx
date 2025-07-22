@@ -1,21 +1,33 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Header } from '@/components/layout/Header';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { QuizQuestion } from '@/types/quiz';
+import { quizDrafts } from '@/lib/drafts';
+import { useAuth } from '@/contexts/AuthContext';
+import { ProtectedRoute } from '@/components/ProtectedRoute';
 
 const DEFAULT_QUESTIONS: QuizQuestion[] = [];
 
 export default function QuizSetupPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const { user } = useAuth();
   const [questions, setQuestions] = useState<QuizQuestion[]>([]);
+  const [currentDraft, setCurrentDraft] = useState<string | null>(null);
+  const [loadingDraft, setLoadingDraft] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
   const [activeTab, setActiveTab] = useState<'manual' | 'ai'>('ai');
   const [errorMessage, setErrorMessage] = useState<string>('');
+  
+  // Save draft modal state
+  const [showSaveModal, setShowSaveModal] = useState(false);
+  const [draftName, setDraftName] = useState('');
+  const [saving, setSaving] = useState(false);
   
   // AI Generation State
   const [topic, setTopic] = useState('');
@@ -45,19 +57,46 @@ export default function QuizSetupPage() {
     'Movies & Entertainment', 'Sports', 'Art & Culture', 'Music', 'General Knowledge'
   ];
 
-  // Load questions from localStorage on component mount
+  // Load questions from draft or localStorage on component mount
   useEffect(() => {
-    const savedQuestions = localStorage.getItem('quiz-setup-questions');
-    if (savedQuestions) {
-      try {
-        const parsedQuestions = JSON.parse(savedQuestions);
-        setQuestions(parsedQuestions);
-      } catch (error) {
-        console.error('Failed to parse saved questions:', error);
+    const loadData = async () => {
+      const draftId = searchParams.get('draft');
+      
+      if (draftId && user) {
+        // Load from draft
+        setLoadingDraft(true);
+        try {
+          const draft = await quizDrafts.getById(draftId);
+          if (draft && draft.questions) {
+            setQuestions(draft.questions);
+            setCurrentDraft(draftId);
+          } else {
+            setErrorMessage('Draft not found');
+          }
+        } catch (error) {
+          setErrorMessage('Failed to load draft');
+          console.error('Draft loading error:', error);
+        } finally {
+          setLoadingDraft(false);
+        }
+      } else {
+        // Load from localStorage as fallback
+        const savedQuestions = localStorage.getItem('quiz-setup-questions');
+        if (savedQuestions) {
+          try {
+            const parsedQuestions = JSON.parse(savedQuestions);
+            setQuestions(parsedQuestions);
+          } catch (error) {
+            console.error('Failed to parse saved questions:', error);
+          }
+        }
       }
-    }
-    setIsLoaded(true);
-  }, []);
+      
+      setIsLoaded(true);
+    };
+    
+    loadData();
+  }, [searchParams, user]);
 
   // Save questions to localStorage whenever questions change
   useEffect(() => {
@@ -228,14 +267,54 @@ export default function QuizSetupPage() {
     router.push('/quiz/host');
   };
 
+  const handleSaveDraft = async () => {
+    if (!draftName.trim()) {
+      setErrorMessage('Please enter a name for your draft');
+      return;
+    }
+
+    if (questions.length === 0) {
+      setErrorMessage('Add at least one question before saving');
+      return;
+    }
+
+    setSaving(true);
+    setErrorMessage('');
+
+    try {
+      await quizDrafts.save({
+        title: draftName.trim(),
+        questions: questions
+      });
+      
+      setShowSaveModal(false);
+      setDraftName('');
+      setErrorMessage('Draft saved successfully!');
+    } catch (error) {
+      setErrorMessage('Failed to save draft. Please try again.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleOpenSaveModal = () => {
+    if (questions.length === 0) {
+      setErrorMessage('Add at least one question before saving');
+      return;
+    }
+    setErrorMessage('');
+    setShowSaveModal(true);
+  };
+
   const isValidQuiz = questions.length >= 3 && questions.every(q => 
     q.text.trim() !== '' && q.options.every(opt => opt.trim() !== '')
   );
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-dark-900 dark">
+    <ProtectedRoute>
+      <div className="min-h-screen bg-gray-50 dark:bg-dark-900 dark">
       <Header 
-        title="Create Quiz" 
+        title={currentDraft ? "Edit Quiz Draft" : "Create Quiz"} 
         subtitle={`${questions.length} question${questions.length !== 1 ? 's' : ''} ready`}
       />
       
@@ -245,19 +324,32 @@ export default function QuizSetupPage() {
           <CardHeader>
             <div className="flex items-start justify-between">
               <div>
-                <CardTitle className="text-gray-900 dark:text-gray-100 mb-2">Questionnaire Creator</CardTitle>
+                <CardTitle className="text-gray-900 dark:text-gray-100 mb-2">
+                  {loadingDraft ? 'Loading Draft...' : currentDraft ? 'Edit Quiz Draft' : 'Questionnaire Creator'}
+                </CardTitle>
                 <p className="text-gray-600 dark:text-gray-400">
                   Create questions using AI generation or manual entry. Enhance and manage your questions.
                 </p>
               </div>
               <div className="flex flex-col items-end space-y-2">
-                <Button 
-                  onClick={handleLaunchQuiz}
-                  disabled={!isValidQuiz}
-                  className="bg-green-600 hover:bg-green-700"
-                >
-                  🚀 Launch Quiz
-                </Button>
+                <div className="flex space-x-3">
+                  {user && (
+                    <Button 
+                      onClick={handleOpenSaveModal}
+                      disabled={questions.length === 0}
+                      variant="outline"
+                    >
+                      💾 Save as Draft
+                    </Button>
+                  )}
+                  <Button 
+                    onClick={handleLaunchQuiz}
+                    disabled={!isValidQuiz}
+                    className="bg-green-600 hover:bg-green-700"
+                  >
+                    🚀 Launch Quiz
+                  </Button>
+                </div>
                 {!isValidQuiz && (
                   <p className="text-xs text-red-600 dark:text-red-400 font-medium">
                     Need at least 3 complete questions
@@ -661,7 +753,83 @@ export default function QuizSetupPage() {
           </div>
         </div>
       )}
-    </div>
+      
+      {/* Save Draft Modal */}
+      {showSaveModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-dark-800 rounded-lg shadow-xl max-w-md w-full">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
+                  Save Quiz as Draft
+                </h2>
+                <button
+                  onClick={() => {
+                    setShowSaveModal(false);
+                    setDraftName('');
+                    setErrorMessage('');
+                  }}
+                  className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+                >
+                  <span className="sr-only">Close</span>
+                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              
+              <div className="space-y-4">
+                <div>
+                  <label htmlFor="draftName" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Draft Name
+                  </label>
+                  <Input
+                    id="draftName"
+                    value={draftName}
+                    onChange={(e) => setDraftName(e.target.value)}
+                    placeholder="Enter a name for your quiz draft"
+                    disabled={saving}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        handleSaveDraft();
+                      }
+                    }}
+                  />
+                </div>
+                
+                <div className="flex justify-end space-x-3">
+                  <Button
+                    onClick={() => {
+                      setShowSaveModal(false);
+                      setDraftName('');
+                      setErrorMessage('');
+                    }}
+                    variant="outline"
+                    disabled={saving}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={handleSaveDraft}
+                    disabled={saving || !draftName.trim()}
+                  >
+                    {saving ? (
+                      <span className="flex items-center space-x-2">
+                        <span className="animate-spin text-sm">🔄</span>
+                        <span>Saving...</span>
+                      </span>
+                    ) : (
+                      'Save Draft'
+                    )}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      </div>
+    </ProtectedRoute>
   );
 }
 
@@ -866,7 +1034,5 @@ function QuestionItem({
         </CardContent>
       </Card>
     </div>
-      </div>
-    </ProtectedRoute>
   );
 }
