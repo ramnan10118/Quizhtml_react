@@ -2,24 +2,25 @@
 
 import React from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
-import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { useAuth } from '@/contexts/AuthContext';
 
 export default function ModeSelectionPage() {
-  const { signOut } = useAuth();
+  const router = useRouter();
+  const { user, signOut } = useAuth();
 
   const handleSignOut = async () => {
     try {
       await signOut();
+      router.push('/auth/login');
     } catch (error) {
       console.error('Sign out error:', error);
     }
   };
 
   return (
-    <ProtectedRoute>
     <div className="min-h-screen bg-gray-50 dark:bg-dark-900 dark">
       {/* Header */}
       <header className="border-b border-gray-200 dark:border-dark-700 bg-white dark:bg-dark-800">
@@ -27,9 +28,35 @@ export default function ModeSelectionPage() {
           <Link href="/" className="text-xl font-semibold text-gray-900 dark:text-gray-100 hover:text-gray-700 dark:hover:text-gray-300">
             Quiz Buzzer
           </Link>
-          <Button onClick={handleSignOut} variant="outline" size="sm">
-            Sign Out
-          </Button>
+          <div className="flex items-center space-x-4">
+{user ? (
+              <>
+                <span className="text-sm text-gray-600 dark:text-gray-400">
+                  {user.user_metadata?.full_name || user.email}
+                </span>
+                <Button
+                  onClick={handleSignOut}
+                  variant="outline"
+                  size="sm"
+                >
+                  Sign Out
+                </Button>
+              </>
+            ) : (
+              <>
+                <Link href="/auth/login">
+                  <Button variant="outline" size="sm">
+                    Sign In
+                  </Button>
+                </Link>
+                <Link href="/auth/signup">
+                  <Button size="sm">
+                    Sign Up
+                  </Button>
+                </Link>
+              </>
+            )}
+          </div>
         </div>
       </header>
       
@@ -76,11 +103,22 @@ export default function ModeSelectionPage() {
                     <span className="text-sm text-gray-700 dark:text-gray-300">Mobile-optimized experience</span>
                   </div>
                 </div>
-                <Link href="/quiz?fresh=true" className="block">
-                  <Button className="w-full" size="lg">
-                    Start Quiz
-                  </Button>
-                </Link>
+                {user ? (
+                  <Link href="/quiz" className="block">
+                    <Button className="w-full" size="lg">
+                      Start Quiz
+                    </Button>
+                  </Link>
+                ) : (
+                  <div className="space-y-2">
+                    <Button disabled className="w-full" size="lg">
+                      Start Quiz
+                    </Button>
+                    <p className="text-xs text-center text-gray-500 dark:text-gray-400">
+                      Sign in required to access quiz features
+                    </p>
+                  </div>
+                )}
               </CardContent>
             </Card>
 
@@ -114,11 +152,22 @@ export default function ModeSelectionPage() {
                     <span className="text-sm text-gray-700 dark:text-gray-300">Real-time vote tracking</span>
                   </div>
                 </div>
-                <Link href="/polling" className="block">
-                  <Button variant="secondary" className="w-full" size="lg">
-                    Start Polling
-                  </Button>
-                </Link>
+                {user ? (
+                  <Link href="/polling" className="block">
+                    <Button variant="secondary" className="w-full" size="lg">
+                      Start Polling
+                    </Button>
+                  </Link>
+                ) : (
+                  <div className="space-y-2">
+                    <Button disabled variant="secondary" className="w-full" size="lg">
+                      Start Polling
+                    </Button>
+                    <p className="text-xs text-center text-gray-500 dark:text-gray-400">
+                      Sign in required to access polling features
+                    </p>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>
@@ -147,6 +196,5 @@ export default function ModeSelectionPage() {
         </div>
       </main>
     </div>
-    </ProtectedRoute>
   );
 }

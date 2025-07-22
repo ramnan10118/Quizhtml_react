@@ -2,31 +2,20 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '@/contexts/AuthContext';
 import { Header } from '@/components/layout/Header';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { QuizQuestion } from '@/types/quiz';
-import { ProtectedRoute } from '@/components/ProtectedRoute';
-import { supabase } from '@/lib/supabase';
 
-// const DEFAULT_QUESTIONS: QuizQuestion[] = [];
+const DEFAULT_QUESTIONS: QuizQuestion[] = [];
 
 export default function QuizSetupPage() {
   const router = useRouter();
-  const { user } = useAuth();
   const [questions, setQuestions] = useState<QuizQuestion[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
   const [activeTab, setActiveTab] = useState<'manual' | 'ai'>('ai');
   const [errorMessage, setErrorMessage] = useState<string>('');
-  
-  // Template Management State
-  const [templateTitle, setTemplateTitle] = useState('');
-  const [templateDescription, setTemplateDescription] = useState('');
-  const [isSaving, setIsSaving] = useState(false);
-  const [currentTemplateId, setCurrentTemplateId] = useState<string | null>(null);
-  const [showSaveDialog, setShowSaveDialog] = useState(false);
   
   // AI Generation State
   const [topic, setTopic] = useState('');
@@ -50,68 +39,24 @@ export default function QuizSetupPage() {
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [reorderingIndex, setReorderingIndex] = useState<number | null>(null);
   const [isAnimating, setIsAnimating] = useState(false);
-  
 
   const topicSuggestions = [
     'History', 'Science', 'Technology', 'Geography', 'Literature',
     'Movies & Entertainment', 'Sports', 'Art & Culture', 'Music', 'General Knowledge'
   ];
 
-  // Load questions and template data on component mount
+  // Load questions from localStorage on component mount
   useEffect(() => {
-    const loadData = async () => {
-      const urlParams = new URLSearchParams(window.location.search);
-      const isFreshStart = urlParams.get('fresh') === 'true';
-      const templateId = urlParams.get('template');
-
-      if (isFreshStart) {
-        // Clear previous session for fresh start
-        localStorage.removeItem('quiz-setup-questions');
-        setQuestions([]);
-        setTemplateTitle('');
-        setTemplateDescription('');
-        setCurrentTemplateId(null);
-      } else if (templateId) {
-        // Load from template
-        try {
-          localStorage.removeItem('quiz-setup-questions'); // Clear localStorage
-          const { data, error } = await supabase
-            .from('templates')
-            .select('*')
-            .eq('id', templateId)
-            .single();
-
-          if (error) throw error;
-          
-          if (data) {
-            setQuestions(data.content.questions || []);
-            setTemplateTitle(data.title);
-            setTemplateDescription(data.description || '');
-            setCurrentTemplateId(data.id);
-            setErrorMessage(`Template "${data.title}" loaded successfully!`);
-            // Clear the success message after 2.5 seconds
-            setTimeout(() => setErrorMessage(''), 2500);
-          }
-        } catch (error) {
-          console.error('Failed to load template:', error);
-          setErrorMessage('Failed to load template. Please try again.');
-        }
-      } else {
-        // Load existing questions if not a fresh start or template load
-        const savedQuestions = localStorage.getItem('quiz-setup-questions');
-        if (savedQuestions) {
-          try {
-            const parsedQuestions = JSON.parse(savedQuestions);
-            setQuestions(parsedQuestions);
-          } catch (error) {
-            console.error('Failed to parse saved questions:', error);
-          }
-        }
+    const savedQuestions = localStorage.getItem('quiz-setup-questions');
+    if (savedQuestions) {
+      try {
+        const parsedQuestions = JSON.parse(savedQuestions);
+        setQuestions(parsedQuestions);
+      } catch (error) {
+        console.error('Failed to parse saved questions:', error);
       }
-      setIsLoaded(true);
-    };
-
-    loadData();
+    }
+    setIsLoaded(true);
   }, []);
 
   // Save questions to localStorage whenever questions change
@@ -227,7 +172,6 @@ export default function QuizSetupPage() {
     setErrorMessage('');
   };
 
-
   const handleDeleteQuestion = (index: number) => {
     if (confirm('Are you sure you want to delete this question?')) {
       setQuestions(questions.filter((_, i) => i !== index));
@@ -279,63 +223,6 @@ export default function QuizSetupPage() {
     }
   };
 
-
-  const handleSaveTemplate = async () => {
-    if (!user) {
-      setErrorMessage('Please log in to save templates');
-      return;
-    }
-
-    if (!templateTitle.trim()) {
-      setErrorMessage('Please enter a template title');
-      return;
-    }
-
-    if (questions.length === 0) {
-      setErrorMessage('Please add at least one question before saving');
-      return;
-    }
-
-    setIsSaving(true);
-    setErrorMessage('');
-
-    try {
-      const templateData = {
-        user_id: user.id,
-        title: templateTitle.trim(),
-        description: templateDescription.trim() || undefined,
-        type: 'quiz' as const,
-        content: { questions },
-        status: 'draft' as const
-      };
-
-      if (currentTemplateId) {
-        const { error } = await supabase
-          .from('templates')
-          .update(templateData)
-          .eq('id', currentTemplateId);
-        if (error) throw error;
-        setErrorMessage('Template updated successfully!');
-      } else {
-        const { data, error } = await supabase
-          .from('templates')
-          .insert([templateData])
-          .select()
-          .single();
-        if (error) throw error;
-        setCurrentTemplateId(data.id);
-        setErrorMessage('Template saved successfully!');
-      }
-      
-      setShowSaveDialog(false);
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'Failed to save template');
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-
   const handleLaunchQuiz = () => {
     sessionStorage.setItem('customQuestions', JSON.stringify(questions));
     router.push('/quiz/host');
@@ -346,7 +233,6 @@ export default function QuizSetupPage() {
   );
 
   return (
-    <ProtectedRoute>
     <div className="min-h-screen bg-gray-50 dark:bg-dark-900 dark">
       <Header 
         title="Create Quiz" 
@@ -365,33 +251,16 @@ export default function QuizSetupPage() {
                 </p>
               </div>
               <div className="flex flex-col items-end space-y-2">
-                <div className="flex space-x-2">
-                  {user && (
-                    <Button 
-                      onClick={() => setShowSaveDialog(true)}
-                      disabled={questions.length === 0}
-                      variant="outline"
-                      className="bg-blue-50 hover:bg-blue-100 border-blue-200"
-                    >
-                      💾 Save Template
-                    </Button>
-                  )}
-                  <Button 
-                    onClick={handleLaunchQuiz}
-                    disabled={!isValidQuiz}
-                    className="bg-green-600 hover:bg-green-700"
-                  >
-                    🚀 Launch Quiz
-                  </Button>
-                </div>
+                <Button 
+                  onClick={handleLaunchQuiz}
+                  disabled={!isValidQuiz}
+                  className="bg-green-600 hover:bg-green-700"
+                >
+                  🚀 Launch Quiz
+                </Button>
                 {!isValidQuiz && (
                   <p className="text-xs text-red-600 dark:text-red-400 font-medium">
-                    Need at least 3 complete questions to launch
-                  </p>
-                )}
-                {!user && questions.length > 0 && (
-                  <p className="text-xs text-blue-600 dark:text-blue-400 font-medium">
-                    <a href="/auth/login" className="underline">Sign in</a> to save your quiz template
+                    Need at least 3 complete questions
                   </p>
                 )}
               </div>
@@ -402,10 +271,10 @@ export default function QuizSetupPage() {
         {errorMessage && (
           <div className={`mb-4 p-3 rounded-lg text-sm ${
             errorMessage.includes('successfully') 
-              ? 'bg-green-100 border border-green-300 text-green-700 notification-fade'
+              ? 'bg-green-100 border border-green-300 text-green-700'
               : 'bg-red-100 border border-red-300 text-red-700'
           }`}>
-            {errorMessage.includes('successfully') ? '✅' : ''} {errorMessage}
+            {errorMessage}
           </div>
         )}
 
@@ -619,7 +488,6 @@ export default function QuizSetupPage() {
                 </CardContent>
               </Card>
             )}
-
           </div>
 
           {/* Right Panel - Question Management */}
@@ -698,88 +566,6 @@ export default function QuizSetupPage() {
           </div>
         </div>
       </main>
-
-      {/* Save Template Modal */}
-      {showSaveDialog && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-dark-800 rounded-lg shadow-xl max-w-md w-full">
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
-                  Save Quiz Template
-                </h2>
-                <button
-                  onClick={() => setShowSaveDialog(false)}
-                  className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
-                >
-                  <span className="sr-only">Close</span>
-                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Template Title *
-                  </label>
-                  <Input
-                    value={templateTitle}
-                    onChange={(e) => setTemplateTitle(e.target.value)}
-                    placeholder="Enter a title for your quiz template"
-                    className="w-full"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Description (Optional)
-                  </label>
-                  <textarea
-                    value={templateDescription}
-                    onChange={(e) => setTemplateDescription(e.target.value)}
-                    placeholder="Add a description for your template..."
-                    className="w-full p-3 border border-gray-300 dark:border-dark-600 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white dark:bg-dark-700 text-gray-900 dark:text-gray-100 resize-none"
-                    rows={3}
-                  />
-                </div>
-
-                <div className="text-sm text-gray-500 dark:text-gray-400">
-                  This template will contain {questions.length} question{questions.length !== 1 ? 's' : ''}
-                </div>
-              </div>
-
-              <div className="flex justify-end space-x-3 mt-6">
-                <Button
-                  onClick={() => setShowSaveDialog(false)}
-                  variant="outline"
-                  disabled={isSaving}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  onClick={handleSaveTemplate}
-                  disabled={!templateTitle.trim() || isSaving}
-                  className="bg-blue-600 hover:bg-blue-700"
-                >
-                  {isSaving ? (
-                    <span className="flex items-center space-x-2">
-                      <span className="animate-spin">🔄</span>
-                      <span>Saving...</span>
-                    </span>
-                  ) : (
-                    <span className="flex items-center space-x-2">
-                      <span>💾</span>
-                      <span>{currentTemplateId ? 'Update' : 'Save'} Template</span>
-                    </span>
-                  )}
-                </Button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Enhancement Preview Modal */}
       {enhancementPreview && (
@@ -876,7 +662,6 @@ export default function QuizSetupPage() {
         </div>
       )}
     </div>
-    </ProtectedRoute>
   );
 }
 
@@ -919,7 +704,6 @@ function QuestionItem({
       onEdit(editedQuestion);
     }
   };
-
 
   if (isEditing) {
     return (
@@ -1082,5 +866,7 @@ function QuestionItem({
         </CardContent>
       </Card>
     </div>
+      </div>
+    </ProtectedRoute>
   );
 }

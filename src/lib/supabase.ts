@@ -9,7 +9,7 @@ if (!supabaseUrl || !supabaseAnonKey) {
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
-// Database types (will be generated later)
+// Database types based on your schema
 export interface Database {
   public: {
     Tables: {
@@ -36,39 +36,42 @@ export interface Database {
           updated_at?: string
         }
       }
-      templates: {
+      drafts: {
         Row: {
           id: string
           user_id: string
           title: string
           description: string | null
-          type: 'quiz' | 'poll'
-          status: 'draft' | 'live' | 'completed'
-          content: Record<string, unknown> // JSON content
+          type: string
+          status: string
+          content: Record<string, unknown>
           created_at: string
           updated_at: string
+          questions: Record<string, unknown> | null
         }
         Insert: {
           id?: string
           user_id: string
           title: string
           description?: string | null
-          type: 'quiz' | 'poll'
-          status?: 'draft' | 'live' | 'completed'
+          type: string
+          status?: string
           content: Record<string, unknown>
           created_at?: string
           updated_at?: string
+          questions?: Record<string, unknown> | null
         }
         Update: {
           id?: string
           user_id?: string
           title?: string
           description?: string | null
-          type?: 'quiz' | 'poll'
-          status?: 'draft' | 'live' | 'completed'
+          type?: string
+          status?: string
           content?: Record<string, unknown>
           created_at?: string
           updated_at?: string
+          questions?: Record<string, unknown> | null
         }
       }
     }

@@ -106,7 +106,7 @@ export default function PollingHostPage() {
 
   return (
     <ProtectedRoute>
-    <div className="min-h-screen bg-gray-50 dark:bg-dark-900 dark">
+      <div className="min-h-screen bg-gray-50 dark:bg-dark-900 dark">
       {/* Header */}
       <header className="border-b border-gray-200 dark:border-dark-700 bg-white dark:bg-dark-800">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
@@ -241,7 +241,7 @@ export default function PollingHostPage() {
           )}
         </div>
       </main>
-    </div>
+      </div>
     </ProtectedRoute>
   );
 }

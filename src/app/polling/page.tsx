@@ -13,7 +13,7 @@ export default function PollingPage() {
 
   return (
     <ProtectedRoute>
-      null
+      <div></div>
     </ProtectedRoute>
   );
 }

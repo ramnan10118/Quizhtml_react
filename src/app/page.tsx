@@ -2,34 +2,69 @@
 
 import React from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '@/contexts/AuthContext';
+import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function HomePage() {
   const router = useRouter();
-  const { user, loading } = useAuth();
+  const { user, signOut } = useAuth();
 
-  // If user is logged in, redirect to dashboard
-  React.useEffect(() => {
-    if (!loading && user) {
-      router.push('/dashboard');
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+      router.push('/auth/login');
+    } catch (error) {
+      console.error('Sign out error:', error);
     }
-  }, [user, loading, router]);
+  };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 dark:bg-dark-900 flex items-center justify-center">
-        <div className="flex items-center space-x-2">
-          <span className="animate-spin text-2xl">🔄</span>
-          <span className="text-gray-600 dark:text-gray-400">Loading...</span>
-        </div>
-      </div>
-    );
-  }
+  // Auto redirect to mode selection
+  React.useEffect(() => {
+    router.push('/mode');
+  }, [router]);
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-dark-900">
+      {/* Header */}
+      <header className="border-b border-gray-200 dark:border-dark-700 bg-white dark:bg-dark-800">
+        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+          <Link href="/" className="text-xl font-semibold text-gray-900 dark:text-gray-100 hover:text-gray-700 dark:hover:text-gray-300">
+            Quiz Buzzer
+          </Link>
+          <div className="flex items-center space-x-4">
+{user ? (
+              <>
+                <span className="text-sm text-gray-600 dark:text-gray-400">
+                  {user.user_metadata?.full_name || user.email}
+                </span>
+                <Button
+                  onClick={handleSignOut}
+                  variant="outline"
+                  size="sm"
+                >
+                  Sign Out
+                </Button>
+              </>
+            ) : (
+              <>
+                <Link href="/auth/login">
+                  <Button variant="outline" size="sm">
+                    Sign In
+                  </Button>
+                </Link>
+                <Link href="/auth/signup">
+                  <Button size="sm">
+                    Sign Up
+                  </Button>
+                </Link>
+              </>
+            )}
+          </div>
+        </div>
+      </header>
+      
       {/* Hero Section */}
       <div className="relative overflow-hidden">
         <div className="max-w-7xl mx-auto px-6 py-16 sm:py-24">
@@ -42,31 +77,12 @@ export default function HomePage() {
               Build interactive quizzes and polls with real-time features. Perfect for education, events, and team building.
             </p>
             
-            {!user && (
-              <div className="mt-10 flex items-center justify-center gap-x-6">
-                <Button
-                  onClick={() => router.push('/auth/signup')}
-                  className="bg-blue-600 hover:bg-blue-700 text-lg px-8 py-3"
-                >
-                  Get Started Free
-                </Button>
-                <Button
-                  onClick={() => router.push('/auth/login')}
-                  variant="outline"
-                  className="text-lg px-8 py-3"
-                >
-                  Sign In
-                </Button>
-              </div>
-            )}
-
-            <div className="mt-8">
+            <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
               <Button
                 onClick={() => router.push('/mode')}
-                variant="outline"
-                className="text-sm"
+                className="bg-blue-600 hover:bg-blue-700 text-lg px-8 py-3"
               >
-                Try without account →
+                Get Started
               </Button>
             </div>
           </div>
@@ -140,23 +156,14 @@ export default function HomePage() {
           <p className="text-xl text-blue-100 mb-8">
             Join thousands of educators and event organizers using our platform
           </p>
-          {!user && (
-            <div className="flex items-center justify-center gap-x-6">
-              <Button
-                onClick={() => router.push('/auth/signup')}
-                className="bg-white text-blue-600 hover:bg-gray-100 text-lg px-8 py-3"
-              >
-                Create Free Account
-              </Button>
-              <Button
-                onClick={() => router.push('/mode')}
-                variant="outline"
-                className="text-white border-white hover:bg-blue-700 text-lg px-8 py-3"
-              >
-                Try Demo
-              </Button>
-            </div>
-          )}
+          <div className="flex items-center justify-center">
+            <Button
+              onClick={() => router.push('/mode')}
+              className="bg-white text-blue-600 hover:bg-gray-100 text-lg px-8 py-3"
+            >
+              Get Started
+            </Button>
+          </div>
         </div>
       </div>
     </div>
