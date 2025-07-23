@@ -8,7 +8,7 @@ interface PollControlsProps {
   currentPoll: Poll | null;
   onClosePoll: () => void;
   onToggleResults: () => void;
-  onNewPoll: () => void;
+  onNewPoll?: () => void; // Make optional since we removed the button
   showResults: boolean;
   totalVotes: number;
   className?: string;

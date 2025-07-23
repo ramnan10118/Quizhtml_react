@@ -189,7 +189,9 @@ function PollingHostContent() {
             id: specificLivePoll.id,
             question: specificLivePoll.content.question,
             options: specificLivePoll.content.options,
+            votes: new Map(), // Initialize empty votes Map
             isActive: true,
+            showResults: specificLivePoll.content.showResults || false,
             createdAt: new Date(specificLivePoll.created_at).getTime()
           };
           
@@ -217,10 +219,14 @@ function PollingHostContent() {
             
             // Set poll results to restore the votes display
             const restoredResults: PollResultsType = {
+              pollId: specificLivePoll.id,
               question: specificLivePoll.content.question,
               options: specificLivePoll.content.options,
               voteCounts,
-              voterNames,
+              voterNames: voterNames.reduce((acc, voters, index) => {
+                acc[index] = voters;
+                return acc;
+              }, {} as Record<number, string[]>),
               totalVotes
             };
             
