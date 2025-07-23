@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -9,12 +9,50 @@ interface PollCreatorProps {
   onCreatePoll: (data: PollCreateData) => void;
   isCreating?: boolean;
   className?: string;
+  initialData?: PollCreateData | null;
+  onDataChange?: (data: PollCreateData) => void;
+  onSaveDraft?: () => void;
+  showSaveDraft?: boolean;
 }
 
-export function PollCreator({ onCreatePoll, isCreating = false, className }: PollCreatorProps) {
+export function PollCreator({ 
+  onCreatePoll, 
+  isCreating = false, 
+  className,
+  initialData = null,
+  onDataChange,
+  onSaveDraft,
+  showSaveDraft = false
+}: PollCreatorProps) {
   const [question, setQuestion] = useState('');
   const [options, setOptions] = useState(['', '']);
   const [errors, setErrors] = useState<{ question?: string; options?: string }>({});
+
+  // Load initial data
+  useEffect(() => {
+    if (initialData && initialData.question && Array.isArray(initialData.options)) {
+      setQuestion(initialData.question);
+      setOptions(initialData.options.length >= 2 ? initialData.options : [...initialData.options, '', ''].slice(0, 6));
+      
+      // Notify parent of loaded data
+      if (onDataChange && typeof onDataChange === 'function') {
+        try {
+          onDataChange(initialData);
+        } catch (error) {
+          console.error('Error calling onDataChange:', error);
+        }
+      }
+    }
+  }, [initialData, onDataChange]);
+
+  // Notify parent of data changes when user saves or launches
+  const getCurrentPollData = (): PollCreateData => {
+    const validOptions = options.filter(opt => opt.trim());
+    return {
+      question: question.trim(),
+      options: validOptions
+    };
+  };
 
   const addOption = () => {
     if (options.length < 6) {
@@ -52,16 +90,26 @@ export function PollCreator({ onCreatePoll, isCreating = false, className }: Pol
 
   const handleCreatePoll = () => {
     if (validatePoll()) {
-      const validOptions = options.filter(opt => opt.trim());
-      onCreatePoll({
-        question: question.trim(),
-        options: validOptions
-      });
-      
-      // Reset form
-      setQuestion('');
-      setOptions(['', '']);
-      setErrors({});
+      try {
+        const pollData = getCurrentPollData();
+        
+        // Notify parent of current data
+        if (onDataChange && typeof onDataChange === 'function') {
+          onDataChange(pollData);
+        }
+        
+        // Create the poll
+        if (onCreatePoll && typeof onCreatePoll === 'function') {
+          onCreatePoll(pollData);
+        }
+        
+        // Reset form
+        setQuestion('');
+        setOptions(['', '']);
+        setErrors({});
+      } catch (error) {
+        console.error('Error creating poll:', error);
+      }
     }
   };
 
@@ -148,23 +196,62 @@ export function PollCreator({ onCreatePoll, isCreating = false, className }: Pol
           )}
         </div>
 
-        {/* Create Button */}
-        <div className="pt-4">
-          <Button
-            onClick={handleCreatePoll}
-            disabled={!hasValidData || isCreating}
-            className="w-full bg-purple-600 hover:bg-purple-700 dark:bg-purple-500 dark:hover:bg-purple-600"
-            size="lg"
-          >
-            {isCreating ? (
-              <span className="flex items-center space-x-2">
-                <span className="animate-spin">🔄</span>
-                <span>Creating Poll...</span>
-              </span>
-            ) : (
-              '🚀 Launch Poll'
-            )}
-          </Button>
+        {/* Action Buttons */}
+        <div className="pt-4 space-y-3">
+          {showSaveDraft && (
+            <div className="flex space-x-3">
+              <Button 
+                onClick={() => {
+                  try {
+                    if (onDataChange && typeof onDataChange === 'function') {
+                      onDataChange(getCurrentPollData());
+                    }
+                    if (onSaveDraft && typeof onSaveDraft === 'function') {
+                      onSaveDraft();
+                    }
+                  } catch (error) {
+                    console.error('Error in save draft:', error);
+                  }
+                }}
+                disabled={!hasValidData || isCreating}
+                variant="outline"
+                className="flex-1"
+              >
+                💾 Save as Draft
+              </Button>
+              <Button
+                onClick={handleCreatePoll}
+                disabled={!hasValidData || isCreating}
+                className="flex-1 bg-purple-600 hover:bg-purple-700 dark:bg-purple-500 dark:hover:bg-purple-600"
+              >
+                {isCreating ? (
+                  <span className="flex items-center space-x-2">
+                    <span className="animate-spin">🔄</span>
+                    <span>Creating...</span>
+                  </span>
+                ) : (
+                  '🚀 Launch Poll'
+                )}
+              </Button>
+            </div>
+          )}
+          {!showSaveDraft && (
+            <Button
+              onClick={handleCreatePoll}
+              disabled={!hasValidData || isCreating}
+              className="w-full bg-purple-600 hover:bg-purple-700 dark:bg-purple-500 dark:hover:bg-purple-600"
+              size="lg"
+            >
+              {isCreating ? (
+                <span className="flex items-center space-x-2">
+                  <span className="animate-spin">🔄</span>
+                  <span>Creating Poll...</span>
+                </span>
+              ) : (
+                '🚀 Launch Poll'
+              )}
+            </Button>
+          )}
         </div>
 
         {/* Helper Text */}

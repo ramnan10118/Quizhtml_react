@@ -20,10 +20,14 @@ export default function HomePage() {
     }
   };
 
-  // Auto redirect to mode selection
+  // Auto redirect based on authentication status
   React.useEffect(() => {
-    router.push('/mode');
-  }, [router]);
+    if (user) {
+      router.push('/dashboard');
+    } else {
+      router.push('/mode');
+    }
+  }, [router, user]);
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-dark-900">

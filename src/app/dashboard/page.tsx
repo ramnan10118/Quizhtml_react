@@ -7,12 +7,14 @@ import { useAuth } from '@/contexts/AuthContext'
 import { ProtectedRoute } from '@/components/ProtectedRoute'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
-import { quizDrafts, QuizDraft } from '@/lib/drafts'
+import { quizDrafts, QuizDraft, pollDrafts, PollDraft, livePolls, LivePoll } from '@/lib/drafts'
 
 export default function DashboardPage() {
   const { user, signOut } = useAuth()
   const router = useRouter()
-  const [drafts, setDrafts] = useState<QuizDraft[]>([])
+  const [quizDraftsList, setQuizDraftsList] = useState<QuizDraft[]>([])
+  const [pollDraftsList, setPollDraftsList] = useState<PollDraft[]>([])
+  const [livePollsList, setLivePollsList] = useState<LivePoll[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -25,8 +27,14 @@ export default function DashboardPage() {
   const loadDrafts = async () => {
     try {
       setLoading(true)
-      const userDrafts = await quizDrafts.getAll()
-      setDrafts(userDrafts)
+      const [userQuizDrafts, userPollDrafts, userLivePolls] = await Promise.all([
+        quizDrafts.getAll(),
+        pollDrafts.getAll(),
+        livePolls.getAll()
+      ])
+      setQuizDraftsList(userQuizDrafts)
+      setPollDraftsList(userPollDrafts)
+      setLivePollsList(userLivePolls)
     } catch (error) {
       setError('Failed to load drafts')
       console.error('Load drafts error:', error)
@@ -44,22 +52,49 @@ export default function DashboardPage() {
     }
   }
 
-  const handleLoadDraft = (draftId: string) => {
-    router.push(`/quiz/setup?draft=${draftId}`)
+  const handleLoadDraft = (draftId: string, draftType: 'quiz' | 'poll') => {
+    if (draftType === 'quiz') {
+      router.push(`/quiz/setup?draft=${draftId}`)
+    } else {
+      router.push(`/polling/host?draft=${draftId}`)
+    }
   }
 
-  const handleDeleteDraft = async (draftId: string, draftTitle: string) => {
+  const handleDeleteDraft = async (draftId: string, draftTitle: string, draftType: 'quiz' | 'poll') => {
     if (!confirm(`Are you sure you want to delete "${draftTitle}"? This action cannot be undone.`)) {
       return
     }
 
     try {
-      await quizDrafts.delete(draftId)
-      setDrafts(drafts.filter(draft => draft.id !== draftId))
+      if (draftType === 'quiz') {
+        await quizDrafts.delete(draftId)
+        setQuizDraftsList(quizDraftsList.filter(draft => draft.id !== draftId))
+      } else {
+        await pollDrafts.delete(draftId)
+        setPollDraftsList(pollDraftsList.filter(draft => draft.id !== draftId))
+      }
     } catch (error) {
       setError('Failed to delete draft')
       console.error('Delete draft error:', error)
     }
+  }
+
+  const handleCloseLivePoll = async (pollId: string, pollTitle: string) => {
+    if (!confirm(`Are you sure you want to close "${pollTitle}"? This will end the live poll session.`)) {
+      return
+    }
+
+    try {
+      await livePolls.close(pollId)
+      setLivePollsList(livePollsList.filter(poll => poll.id !== pollId))
+    } catch (error) {
+      setError('Failed to close live poll')
+      console.error('Close live poll error:', error)
+    }
+  }
+
+  const handleResumeLivePoll = (pollId: string) => {
+    router.push(`/polling/host`)
   }
 
   return (
@@ -77,7 +112,7 @@ export default function DashboardPage() {
               </p>
             </div>
             <div className="flex items-center space-x-4">
-              {drafts.length > 0 && (
+              {(quizDraftsList.length > 0 || pollDraftsList.length > 0 || livePollsList.length > 0) && (
                 <>
                   <Link href="/quiz/setup">
                     <Button variant="outline" size="sm">
@@ -110,11 +145,66 @@ export default function DashboardPage() {
           )}
 
 
+          {/* Live Polls Section */}
+          {!loading && livePollsList.length > 0 && (
+            <div className="mb-8">
+              <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-4">
+                🔴 Live Polls
+              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {livePollsList.map((livePoll) => (
+                  <Card key={`live-${livePoll.id}`} className="hover:shadow-lg transition-shadow border-l-4 border-l-red-500">
+                    <CardHeader>
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-center space-x-2">
+                          <span className="text-xl">🔴</span>
+                          <div className="flex-1 min-w-0">
+                            <CardTitle className="text-lg font-semibold line-clamp-1">
+                              {livePoll.title}
+                            </CardTitle>
+                          </div>
+                        </div>
+                        <span className="text-xs bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200 px-2 py-1 rounded-full">
+                          LIVE
+                        </span>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                        {livePoll.content && livePoll.content.options 
+                          ? `${livePoll.content.options.length} options`
+                          : '0 options'
+                        } • Started {new Date(livePoll.created_at).toLocaleDateString()}
+                      </div>
+                      <div className="flex space-x-2">
+                        <Button
+                          onClick={() => handleResumeLivePoll(livePoll.id)}
+                          className="flex-1 text-sm bg-red-600 hover:bg-red-700"
+                          size="sm"
+                        >
+                          Resume Poll
+                        </Button>
+                        <Button
+                          onClick={() => handleCloseLivePoll(livePoll.id, livePoll.title)}
+                          variant="outline"
+                          size="sm"
+                          className="text-sm px-3 bg-white dark:bg-white !text-black border-gray-300 hover:bg-gray-50"
+                        >
+                          Close
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Section Title */}
-          {!loading && drafts.length > 0 && (
+          {!loading && (quizDraftsList.length > 0 || pollDraftsList.length > 0) && (
             <div className="mb-6">
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-                My Drafts
+              <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">
+                📝 My Drafts
               </h2>
             </div>
           )}
@@ -127,7 +217,7 @@ export default function DashboardPage() {
                 <span className="text-gray-600 dark:text-gray-400">Loading drafts...</span>
               </div>
             </div>
-          ) : drafts.length === 0 ? (
+          ) : (quizDraftsList.length === 0 && pollDraftsList.length === 0 && livePollsList.length === 0) ? (
             /* Empty State */
             <Card>
               <CardContent className="text-center py-16">
@@ -159,8 +249,9 @@ export default function DashboardPage() {
           ) : (
             /* Drafts Grid */
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {drafts.map((draft) => (
-                <Card key={draft.id} className="hover:shadow-lg transition-shadow">
+              {/* Quiz Drafts */}
+              {quizDraftsList.map((draft) => (
+                <Card key={`quiz-${draft.id}`} className="hover:shadow-lg transition-shadow">
                   <CardHeader>
                     <div className="flex items-start justify-between">
                       <div className="flex items-center space-x-2">
@@ -182,14 +273,57 @@ export default function DashboardPage() {
                     </div>
                     <div className="flex space-x-2">
                       <Button
-                        onClick={() => handleLoadDraft(draft.id)}
+                        onClick={() => handleLoadDraft(draft.id, 'quiz')}
                         className="flex-1 text-sm"
                         size="sm"
                       >
                         Load Draft
                       </Button>
                       <Button
-                        onClick={() => handleDeleteDraft(draft.id, draft.title)}
+                        onClick={() => handleDeleteDraft(draft.id, draft.title, 'quiz')}
+                        variant="outline"
+                        size="sm"
+                        className="text-sm px-3 bg-white dark:bg-white !text-black border-gray-300 hover:bg-gray-50"
+                      >
+                        Delete
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+              
+              {/* Poll Drafts */}
+              {pollDraftsList.map((draft) => (
+                <Card key={`poll-${draft.id}`} className="hover:shadow-lg transition-shadow">
+                  <CardHeader>
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center space-x-2">
+                        <span className="text-xl">📊</span>
+                        <div className="flex-1 min-w-0">
+                          <CardTitle className="text-lg font-semibold line-clamp-1">
+                            {draft.title}
+                          </CardTitle>
+                        </div>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                      {draft.content && draft.content.options 
+                        ? `${draft.content.options.length} options`
+                        : '0 options'
+                      } • Created {new Date(draft.created_at).toLocaleDateString()}
+                    </div>
+                    <div className="flex space-x-2">
+                      <Button
+                        onClick={() => handleLoadDraft(draft.id, 'poll')}
+                        className="flex-1 text-sm"
+                        size="sm"
+                      >
+                        Load Draft
+                      </Button>
+                      <Button
+                        onClick={() => handleDeleteDraft(draft.id, draft.title, 'poll')}
                         variant="outline"
                         size="sm"
                         className="text-sm px-3 bg-white dark:bg-white !text-black border-gray-300 hover:bg-gray-50"

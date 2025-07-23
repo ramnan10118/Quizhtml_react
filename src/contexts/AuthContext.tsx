@@ -37,10 +37,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(session?.user ?? null)
       setLoading(false)
 
-      // Create profile on sign up
-      if (event === 'SIGNED_IN' && session?.user) {
-        await createProfile(session.user)
-      }
+      // Create profile on sign up (disabled for now to prevent errors)
+      // if (event === 'SIGNED_IN' && session?.user) {
+      //   await createProfile(session.user)
+      // }
     })
 
     return () => subscription.unsubscribe()
@@ -48,9 +48,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const createProfile = async (user: User) => {
     try {
+      // Use upsert to handle case where profile already exists
       const { error } = await supabase
         .from('profiles')
-        .insert([
+        .upsert([
           {
             id: user.id,
             email: user.email || '',
@@ -58,13 +59,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           },
-        ])
+        ], {
+          onConflict: 'id'
+        })
 
       if (error) {
         console.error('Error creating profile:', error)
+        // Don't throw the error, just log it since profiles table might not exist yet
       }
     } catch (error) {
       console.error('Error creating profile:', error)
+      // Don't throw the error, just log it since profiles table might not exist yet
     }
   }
 

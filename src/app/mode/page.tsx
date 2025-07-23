@@ -11,6 +11,13 @@ export default function ModeSelectionPage() {
   const router = useRouter();
   const { user, signOut } = useAuth();
 
+  // Redirect authenticated users to dashboard
+  React.useEffect(() => {
+    if (user) {
+      router.push('/dashboard');
+    }
+  }, [user, router]);
+
   const handleSignOut = async () => {
     try {
       await signOut();
