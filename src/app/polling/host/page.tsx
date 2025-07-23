@@ -190,7 +190,7 @@ function PollingHostContent() {
             question: specificLivePoll.content.question,
             options: specificLivePoll.content.options,
             isActive: true,
-            createdAt: specificLivePoll.created_at
+            createdAt: new Date(specificLivePoll.created_at).getTime()
           };
           
           setCurrentPoll(pollFromDb);
