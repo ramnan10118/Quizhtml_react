@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Header } from '@/components/layout/Header';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
@@ -11,9 +11,8 @@ import { quizDrafts } from '@/lib/drafts';
 import { useAuth } from '@/contexts/AuthContext';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 
-const DEFAULT_QUESTIONS: QuizQuestion[] = [];
 
-export default function QuizSetupPage() {
+function QuizSetupContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user } = useAuth();
@@ -284,7 +283,7 @@ export default function QuizSetupPage() {
       setShowSaveModal(false);
       setDraftName('');
       setErrorMessage('Draft saved successfully!');
-    } catch (error) {
+    } catch {
       setErrorMessage('Failed to save draft. Please try again.');
     } finally {
       setSaving(false);
@@ -1028,5 +1027,18 @@ function QuestionItem({
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+export default function QuizSetupPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-gray-50 dark:bg-dark-900 flex items-center justify-center">
+      <div className="text-center">
+        <div className="animate-spin text-4xl mb-4">🔄</div>
+        <p className="text-gray-600 dark:text-gray-400">Loading quiz setup...</p>
+      </div>
+    </div>}>
+      <QuizSetupContent />
+    </Suspense>
   );
 }

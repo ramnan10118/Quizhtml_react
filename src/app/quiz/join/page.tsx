@@ -11,12 +11,11 @@ import { BuzzerButton } from '@/components/quiz/BuzzerButton';
 import { useSocket } from '@/hooks/useSocket';
 import { useQuizState } from '@/hooks/useQuizState';
 import { useHapticFeedback } from '@/hooks/useHapticFeedback';
-import { ScoreData } from '@/types/quiz';
 import confetti from 'canvas-confetti';
 
 export default function JoinPage() {
   const router = useRouter();
-  const { socket, connectionStatus } = useSocket();
+  const { socket } = useSocket();
   const {
     quizState,
     updateCurrentQuestion,
@@ -26,11 +25,9 @@ export default function JoinPage() {
   const [teamName, setTeamName] = useState('');
   const [isRegistered, setIsRegistered] = useState(false);
   const [inputName, setInputName] = useState('');
-  const [statusMessage, setStatusMessage] = useState('');
   const [isCelebrating, setIsCelebrating] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
   const [revealedAnswer, setRevealedAnswer] = useState<number | null>(null);
-  const [teamScores, setTeamScores] = useState<ScoreData[]>([]);
   
   const { success, error, connectionChange } = useHapticFeedback();
 
@@ -118,10 +115,6 @@ export default function JoinPage() {
       router.push('/mode');
     });
 
-    // Handle team scores updates
-    socket.on('score-update', (data) => {
-      setTeamScores(data.teams || []);
-    });
 
     // Request current question on connection
     if (isRegistered && teamName) {
@@ -136,9 +129,8 @@ export default function JoinPage() {
       socket.off('answer-revealed');
       socket.off('celebrate');
       socket.off('quiz-ended');
-      socket.off('score-update');
     };
-  }, [socket, updateCurrentQuestion, setSinglePlayerBuzzState, success, error, connectionChange, isRegistered, teamName]);
+  }, [socket, updateCurrentQuestion, setSinglePlayerBuzzState, success, error, connectionChange, isRegistered, teamName, router]);
 
   const handleRegisterTeam = () => {
     const name = inputName.trim();
@@ -153,7 +145,6 @@ export default function JoinPage() {
       socket.emit('register-team', { teamName: name });
       socket.emit('request-question-number');
       success();
-      setStatusMessage('');
     }
   };
 
@@ -166,15 +157,6 @@ export default function JoinPage() {
     }
   };
 
-  const handleQuitSession = () => {
-    if (confirm('Are you sure you want to quit? This will end your session.')) {
-      setTeamName('');
-      setIsRegistered(false);
-      setInputName('');
-      setSinglePlayerBuzzState(false);
-      window.location.reload();
-    }
-  };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {

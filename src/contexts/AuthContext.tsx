@@ -38,7 +38,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setLoading(false)
 
       // Create profile on sign up
-      if (event === 'SIGNED_UP' && session?.user) {
+      if (event === 'SIGNED_IN' && session?.user) {
         await createProfile(session.user)
       }
     })

@@ -82,7 +82,7 @@ export default function PollingJoinPage() {
       console.log('Vote confirmed:', data);
       setVoteSubmitted(true);
       setSelectedOption(data.optionIndex);
-      setVoteStatus(true, data.optionIndex);
+      setVoteStatus(true);
       
       // Haptic feedback
       if (navigator.vibrate) {

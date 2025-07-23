@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { QuizState, QuizQuestion, RankingData, QUIZ_QUESTIONS } from '@/types/quiz';
 
 // Get custom questions from sessionStorage if available

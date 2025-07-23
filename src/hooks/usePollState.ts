@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { Poll, PollState, PollResults, PollCreateData } from '@/types/polling';
+import { Poll, PollState, PollResults } from '@/types/polling';
 
 const initialState: PollState = {
   currentPoll: null,
@@ -62,7 +62,7 @@ export function usePollState(isHost: boolean = false) {
     }));
   }, []);
 
-  const setVoteStatus = useCallback((hasVoted: boolean, optionIndex?: number) => {
+  const setVoteStatus = useCallback((hasVoted: boolean) => {
     setPollState(prev => ({
       ...prev,
       hasVoted,
