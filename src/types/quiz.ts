@@ -64,6 +64,7 @@ export interface ServerToClientEvents {
   'celebrate': (data: CelebrationData) => void;
   'answer-revealed': (data: { revealedAnswer: number }) => void;
   'quiz-ended': (data: { message: string }) => void;
+  'score-update': (data: { teams: ScoreData[] }) => void;
   'error': (data: { message: string }) => void;
   'connect': () => void;
   'disconnect': () => void;
