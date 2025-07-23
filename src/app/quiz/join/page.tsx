@@ -11,6 +11,7 @@ import { BuzzerButton } from '@/components/quiz/BuzzerButton';
 import { useSocket } from '@/hooks/useSocket';
 import { useQuizState } from '@/hooks/useQuizState';
 import { useHapticFeedback } from '@/hooks/useHapticFeedback';
+import { ScoreData } from '@/types/quiz';
 import confetti from 'canvas-confetti';
 
 export default function JoinPage() {
@@ -29,7 +30,7 @@ export default function JoinPage() {
   const [isCelebrating, setIsCelebrating] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
   const [revealedAnswer, setRevealedAnswer] = useState<number | null>(null);
-  const [teamScores, setTeamScores] = useState<{ name: string; score: number }[]>([]);
+  const [teamScores, setTeamScores] = useState<ScoreData[]>([]);
   
   const { success, error, connectionChange } = useHapticFeedback();
 
