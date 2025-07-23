@@ -41,6 +41,9 @@ function PollingHostContent() {
   const [currentLivePollId, setCurrentLivePollId] = useState<string | null>(null);
   const currentLivePollIdRef = useRef<string | null>(null);
   
+  // Socket poll ID (different from database ID)
+  const [socketPollId, setSocketPollId] = useState<string | null>(null);
+  
   const {
     pollState,
     setCurrentPoll,
@@ -70,6 +73,7 @@ function PollingHostContent() {
     socketInstance.on('poll-created', (poll: Poll) => {
       console.log('Poll created:', poll);
       setCurrentPoll(poll);
+      setSocketPollId(poll.id); // Store the socket server's poll ID
       setShowCreator(false);
       setShowResults(false);
     });
@@ -129,8 +133,8 @@ function PollingHostContent() {
 
     socketInstance.on('poll-closed', (results: PollResultsType) => {
       console.log('Poll closed:', results);
-      setPollResults(results);
-      closePoll();
+      setPollResults(results); // Keep the final results visible
+      closePoll(); // This just marks poll as inactive, doesn't clear results
     });
 
     socketInstance.on('error', (error: { message: string }) => {
@@ -168,42 +172,42 @@ function PollingHostContent() {
     loadDraftFromUrl();
   }, [searchParams, user]);
 
-  // Load any existing live poll on mount
+  // Load specific live poll from URL parameter
   useEffect(() => {
-    const loadExistingLivePoll = async () => {
-      if (!user) return;
+    const loadSpecificLivePoll = async () => {
+      const livePollId = searchParams.get('live');
+      if (!livePollId || !user) return;
       
       try {
-        const livePolls_list = await livePolls.getAll();
-        if (livePolls_list.length > 0) {
-          const mostRecentLivePoll = livePolls_list[0];
-          setCurrentLivePollId(mostRecentLivePoll.id);
-          currentLivePollIdRef.current = mostRecentLivePoll.id;
+        const specificLivePoll = await livePolls.getById(livePollId);
+        if (specificLivePoll) {
+          setCurrentLivePollId(specificLivePoll.id);
+          currentLivePollIdRef.current = specificLivePoll.id;
           
           // Create a Poll object from the LivePoll data
           const pollFromDb: Poll = {
-            id: mostRecentLivePoll.id,
-            question: mostRecentLivePoll.content.question,
-            options: mostRecentLivePoll.content.options,
+            id: specificLivePoll.id,
+            question: specificLivePoll.content.question,
+            options: specificLivePoll.content.options,
             isActive: true,
-            createdAt: mostRecentLivePoll.created_at
+            createdAt: specificLivePoll.created_at
           };
           
           setCurrentPoll(pollFromDb);
           setShowCreator(false);
           
           // Restore existing votes data if available
-          console.log('Live poll content:', mostRecentLivePoll.content);
-          if (mostRecentLivePoll.content.votes && Object.keys(mostRecentLivePoll.content.votes).length > 0) {
-            console.log('Found existing votes:', mostRecentLivePoll.content.votes);
+          console.log('Live poll content:', specificLivePoll.content);
+          if (specificLivePoll.content.votes && Object.keys(specificLivePoll.content.votes).length > 0) {
+            console.log('Found existing votes:', specificLivePoll.content.votes);
             
             // Convert votes object to poll results format
-            const voteCounts: number[] = new Array(mostRecentLivePoll.content.options.length).fill(0);
-            const voterNames: string[][] = mostRecentLivePoll.content.options.map(() => []);
+            const voteCounts: number[] = new Array(specificLivePoll.content.options.length).fill(0);
+            const voterNames: string[][] = specificLivePoll.content.options.map(() => []);
             let totalVotes = 0;
             
             // Process votes data
-            Object.entries(mostRecentLivePoll.content.votes).forEach(([voterName, optionIndex]) => {
+            Object.entries(specificLivePoll.content.votes).forEach(([voterName, optionIndex]) => {
               if (typeof optionIndex === 'number' && optionIndex >= 0 && optionIndex < voteCounts.length) {
                 voteCounts[optionIndex]++;
                 voterNames[optionIndex].push(voterName);
@@ -213,8 +217,8 @@ function PollingHostContent() {
             
             // Set poll results to restore the votes display
             const restoredResults: PollResultsType = {
-              question: mostRecentLivePoll.content.question,
-              options: mostRecentLivePoll.content.options,
+              question: specificLivePoll.content.question,
+              options: specificLivePoll.content.options,
               voteCounts,
               voterNames,
               totalVotes
@@ -227,12 +231,12 @@ function PollingHostContent() {
           }
         }
       } catch (error) {
-        console.error('Error loading existing live poll:', error);
+        console.error('Error loading specific live poll:', error);
       }
     };
 
-    loadExistingLivePoll();
-  }, [user, setCurrentPoll]);
+    loadSpecificLivePoll();
+  }, [searchParams, user, setCurrentPoll]);
 
   const handleCreatePoll = async (pollData: PollCreateData) => {
     if (socket && isConnected) {
@@ -303,9 +307,12 @@ function PollingHostContent() {
   const handleClosePoll = async () => {
     if (socket && isConnected && pollState.currentPoll) {
       // First emit to socket to close the actual poll session (original behavior)
-      socket.emit('close-poll', pollState.currentPoll.id);
+      console.log('Closing poll with socket ID:', socketPollId);
+      if (socketPollId) {
+        socket.emit('close-poll', socketPollId);
+      }
       
-      // Then update database if we have a live poll ID
+      // Update database if we have a live poll ID
       if (currentLivePollId) {
         try {
           await livePolls.close(currentLivePollId);
@@ -313,9 +320,19 @@ function PollingHostContent() {
           currentLivePollIdRef.current = null;
         } catch (error) {
           console.error('Error closing live poll in database:', error);
-          // Don't show error to user since the poll is already closed in socket
         }
       }
+      
+      // Clear socket poll ID since we're closing
+      setSocketPollId(null);
+      
+      // Fallback: Update UI after a short delay if socket doesn't respond
+      setTimeout(() => {
+        if (pollState.currentPoll && pollState.currentPoll.isActive) {
+          console.log('Socket did not respond, forcing UI update');
+          closePoll(); // This marks poll as inactive but keeps results visible
+        }
+      }, 1000); // Wait 1 second for socket response
     }
   };
 

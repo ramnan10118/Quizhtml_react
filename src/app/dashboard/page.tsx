@@ -94,7 +94,7 @@ export default function DashboardPage() {
   }
 
   const handleResumeLivePoll = (pollId: string) => {
-    router.push(`/polling/host`)
+    router.push(`/polling/host?live=${pollId}`)
   }
 
   return (

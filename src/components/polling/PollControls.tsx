@@ -70,15 +70,6 @@ export function PollControls({
             </Button>
           )}
 
-          {/* New Poll - Only show when no active poll */}
-          {!hasActivePoll && (
-            <Button
-              onClick={onNewPoll}
-              className="w-full bg-purple-600 hover:bg-purple-700 dark:bg-purple-500 dark:hover:bg-purple-600"
-            >
-              ➕ Create New Poll
-            </Button>
-          )}
 
           {/* Commented out for now - can bring back later */}
           {/* {hasActivePoll && (
