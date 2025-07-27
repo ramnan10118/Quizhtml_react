@@ -114,7 +114,7 @@ export default function DashboardPage() {
             <div className="flex items-center space-x-4">
               {(quizDraftsList.length > 0 || pollDraftsList.length > 0 || livePollsList.length > 0) && (
                 <>
-                  <Link href="/quiz/setup">
+                  <Link href="/quiz">
                     <Button variant="outline" size="sm">
                       🎯 Create Quiz
                     </Button>
@@ -232,7 +232,7 @@ export default function DashboardPage() {
                     Start creating your first quiz or poll draft to see them here.
                   </p>
                   <div className="flex justify-center space-x-4">
-                    <Link href="/quiz/setup">
+                    <Link href="/quiz">
                       <Button className="bg-blue-600 hover:bg-blue-700">
                         🎯 Create Quiz
                       </Button>

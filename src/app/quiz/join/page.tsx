@@ -2,15 +2,16 @@
 
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
-import { Input } from '@/components/ui/Input';
-import { Button } from '@/components/ui/Button';
+import { Card, CardContent, CardHeader, CardTitle, Input, Button } from '@/components/ui'
 import { Header } from '@/components/layout/Header';
 import { QuestionDisplay } from '@/components/quiz/QuestionDisplay';
 import { BuzzerButton } from '@/components/quiz/BuzzerButton';
+import { BasicQuizInterface } from '@/components/quiz/BasicQuizInterface';
+import { ScheduledQuizInterface } from '@/components/quiz/ScheduledQuizInterface';
 import { useSocket } from '@/hooks/useSocket';
 import { useQuizState } from '@/hooks/useQuizState';
 import { useHapticFeedback } from '@/hooks/useHapticFeedback';
+import { QuizMode } from '@/types/quiz';
 import confetti from 'canvas-confetti';
 
 export default function JoinPage() {
@@ -29,6 +30,15 @@ export default function JoinPage() {
   const [isMounted, setIsMounted] = useState(false);
   const [revealedAnswer, setRevealedAnswer] = useState<number | null>(null);
   
+  // Quiz mode detection (to be received from host)
+  const [quizMode, setQuizMode] = useState<QuizMode>('buzzer');
+  const [questions, setQuestions] = useState([]);
+  const [quizSettings, setQuizSettings] = useState<{ timeLimit?: number }>({});
+  
+  // Submission states
+  const [isQuizSubmitted, setIsQuizSubmitted] = useState(false);
+  const [submissionConfirmed, setSubmissionConfirmed] = useState(false);
+  
   const { success, error, connectionChange } = useHapticFeedback();
 
   useEffect(() => {
@@ -39,6 +49,13 @@ export default function JoinPage() {
     if (!socket) return;
 
     // Socket event listeners
+    socket.on('quiz-mode-set', (data) => {
+      setQuizMode(data.mode);
+      setQuizSettings(data.settings || {});
+      setQuestions(data.questions || []);
+      console.log('Quiz mode set to:', data.mode);
+    });
+
     socket.on('question-change', (data) => {
       updateCurrentQuestion(data.questionNumber, data.questionData);
       setSinglePlayerBuzzState(true);
@@ -115,6 +132,28 @@ export default function JoinPage() {
       router.push('/mode');
     });
 
+    // Basic mode events
+    socket.on('basic-quiz-submitted', (data) => {
+      console.log('Basic quiz submission confirmed:', data);
+      setSubmissionConfirmed(true);
+    });
+
+    // Scheduled mode events
+    socket.on('submission-stored', (data) => {
+      console.log('Scheduled submission confirmed:', data);
+      setSubmissionConfirmed(true);
+    });
+
+    socket.on('question-revealed', (data) => {
+      console.log('Question revealed:', data);
+      // Update revealed questions state
+    });
+
+    socket.on('leaderboard-updated', (data) => {
+      console.log('Leaderboard updated for participant:', data);
+      // Update leaderboard display
+    });
+
 
     // Request current question on connection
     if (isRegistered && teamName) {
@@ -123,12 +162,17 @@ export default function JoinPage() {
     }
 
     return () => {
+      socket.off('quiz-mode-set');
       socket.off('question-change');
       socket.off('buzz');
       socket.off('reset-buzzer');
       socket.off('answer-revealed');
       socket.off('celebrate');
       socket.off('quiz-ended');
+      socket.off('basic-quiz-submitted');
+      socket.off('submission-stored');
+      socket.off('question-revealed');
+      socket.off('leaderboard-updated');
     };
   }, [socket, updateCurrentQuestion, setSinglePlayerBuzzState, success, error, connectionChange, isRegistered, teamName, router]);
 
@@ -186,7 +230,9 @@ export default function JoinPage() {
             /* Registration Form */
             <Card className="bg-white/10 dark:bg-dark-800/50 backdrop-blur border-white/20 dark:border-dark-600">
               <CardHeader className="pb-4">
-                <CardTitle className="text-lg sm:text-xl text-gray-900 dark:text-gray-100 text-center">Join the Quiz</CardTitle>
+                <CardTitle className="text-lg sm:text-xl text-gray-900 dark:text-gray-100 text-center">
+                  Join the {quizMode.charAt(0).toUpperCase() + quizMode.slice(1)} Quiz
+                </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <Input
@@ -208,21 +254,62 @@ export default function JoinPage() {
               </CardContent>
             </Card>
           ) : (
-            /* Question Display */
-            <QuestionDisplay
-              questionNumber={quizState.currentQuestion}
-              question={quizState.currentQuestionData}
-              isHost={false}
-              revealedAnswer={revealedAnswer}
-              className="bg-white/10 dark:bg-dark-800/50 backdrop-blur border-white/20 dark:border-dark-600"
-            />
+            /* Mode-specific interfaces */
+            <>
+              {quizMode === 'buzzer' && (
+                <QuestionDisplay
+                  questionNumber={quizState.currentQuestion}
+                  question={quizState.currentQuestionData}
+                  isHost={false}
+                  revealedAnswer={revealedAnswer}
+                  className="bg-white/10 dark:bg-dark-800/50 backdrop-blur border-white/20 dark:border-dark-600"
+                />
+              )}
+              
+              {quizMode === 'basic' && (
+                <BasicQuizInterface
+                  questions={questions}
+                  participantName={teamName}
+                  onComplete={(answers) => {
+                    console.log('Basic quiz completed:', answers);
+                    setIsQuizSubmitted(true);
+                    if (socket) {
+                      socket.emit('submit-basic-quiz', {
+                        participantName: teamName,
+                        answers: answers
+                      });
+                    }
+                  }}
+                  timeLimit={quizSettings.timeLimit}
+                  className="w-full"
+                />
+              )}
+              
+              {quizMode === 'scheduled' && (
+                <ScheduledQuizInterface
+                  questions={questions}
+                  participantName={teamName}
+                  onSubmitAnswers={(answers) => {
+                    console.log('Scheduled quiz submitted:', answers);
+                    setIsQuizSubmitted(true);
+                    if (socket) {
+                      socket.emit('submit-scheduled-quiz', {
+                        participantName: teamName,
+                        answers: answers
+                      });
+                    }
+                  }}
+                  isSubmitted={isQuizSubmitted}
+                  className="w-full"
+                />
+              )}
+            </>
           )}
-
         </div>
       </main>
 
-      {/* Buzzer Button */}
-      {isRegistered && (
+      {/* Buzzer Button - only for buzzer mode */}
+      {isRegistered && quizMode === 'buzzer' && (
         <BuzzerButton
           onBuzz={handleBuzz}
           disabled={!quizState.canBuzz}

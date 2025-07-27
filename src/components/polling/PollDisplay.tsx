@@ -1,8 +1,7 @@
-import React from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
-// import { Button } from '@/components/ui/Button';
-import { Poll } from '@/types/polling';
-import { getOptionLabel, cn } from '@/lib/utils';
+import * as React from 'react'
+import { Card, CardContent, CardHeader, CardTitle, cn } from '@/components/ui'
+import { Poll } from '@/types/polling'
+import { getOptionLabel } from '@/lib/utils'
 
 interface PollDisplayProps {
   poll: Poll | null;

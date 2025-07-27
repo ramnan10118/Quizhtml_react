@@ -4,6 +4,17 @@ export interface QuizQuestion {
   correct: number;
 }
 
+// Quiz mode types
+export type QuizMode = 'buzzer' | 'basic' | 'scheduled';
+
+export interface QuizSettings {
+  mode: QuizMode;
+  timeLimit?: number;
+  allowRetakes?: boolean;
+  showCorrectAnswers?: boolean;
+  passingScore?: number;
+}
+
 export interface BuzzData {
   teamName: string;
   timestamp: number;
@@ -42,7 +53,45 @@ export interface ConnectionStatus {
   connectionMessage: string;
 }
 
+// Basic and Scheduled mode interfaces
+export interface ParticipantAnswer {
+  questionIndex: number;
+  selectedOption: number;
+  timestamp: number;
+}
+
+export interface ParticipantSubmission {
+  participantName: string;
+  socketId: string;
+  answers: ParticipantAnswer[];
+  submissionTime: number;
+  score?: number;
+  isComplete: boolean;
+}
+
+export interface LeaderboardEntry {
+  rank: number;
+  participantName: string;
+  score: number;
+  submissionTime: number;
+  questionsRevealed: number;
+}
+
+export interface RevealState {
+  questionIndex: number;
+  isRevealed: boolean;
+  revealedAt?: number;
+}
+
+export interface ScheduledQuizState {
+  submissions: ParticipantSubmission[];
+  revealedQuestions: RevealState[];
+  leaderboardVisible: boolean;
+  isComplete: boolean;
+}
+
 export interface QuizState {
+  mode: QuizMode;
   currentQuestion: number;
   totalQuestions: number;
   currentQuestionData: QuizQuestion | null;
@@ -52,10 +101,15 @@ export interface QuizState {
   rankings: RankingData[];
   canBuzz: boolean;
   isHost: boolean;
+  settings: QuizSettings;
+  // New mode-specific state
+  basicSubmissions?: ParticipantSubmission[];
+  scheduledState?: ScheduledQuizState;
 }
 
 // Socket.io event types
 export interface ServerToClientEvents {
+  // Existing buzzer mode events
   'question-change': (data: QuestionChangeData) => void;
   'buzz': (data: BuzzData) => void;
   'reset-buzzer': () => void;
@@ -69,9 +123,26 @@ export interface ServerToClientEvents {
   'connect': () => void;
   'disconnect': () => void;
   'connect_error': (error: Error) => void;
+  
+  // New mode selection events
+  'quiz-mode-set': (data: { mode: QuizMode; settings: QuizSettings }) => void;
+  
+  // Basic mode events
+  'submission-received': (data: { participantName: string; submissionTime: number }) => void;
+  'submissions-count-update': (data: { count: number; total: number }) => void;
+  'quiz-results': (data: { submission: ParticipantSubmission }) => void;
+  
+  // Scheduled mode events
+  'submission-stored': (data: { participantName: string }) => void;
+  'question-revealed': (data: { questionIndex: number; correctAnswer: number }) => void;
+  'all-questions-revealed': (data: { leaderboard: LeaderboardEntry[] }) => void;
+  'leaderboard-updated': (data: { leaderboard: LeaderboardEntry[]; visible: boolean }) => void;
+  'leaderboard-visibility-changed': (data: { visible: boolean }) => void;
+  'announcement': (data: { message: string; timestamp: number }) => void;
 }
 
 export interface ClientToServerEvents {
+  // Existing buzzer mode events
   'question-change': (data: { questionNumber: number }) => void;
   'buzz': (data: { teamName: string; timestamp: number }) => void;
   'reset-buzzer': () => void;
@@ -81,6 +152,25 @@ export interface ClientToServerEvents {
   'set-custom-questions': (data: { questions: QuizQuestion[] }) => void;
   'answer-revealed': (data: { revealedAnswer: number }) => void;
   'host-exit-quiz': () => void;
+  
+  // Mode selection events
+  'set-quiz-mode': (data: { mode: QuizMode; settings: QuizSettings }) => void;
+  
+  // Basic mode events
+  'submit-quiz': (data: { participantName: string; answers: ParticipantAnswer[] }) => void;
+  'get-submissions-count': () => void;
+  'get-submissions-list': () => void;
+  'get-results-summary': () => void;
+  'quiz-settings-update': (data: { settings: Partial<QuizSettings> }) => void;
+  
+  // Scheduled mode events  
+  'submit-answers': (data: { participantName: string; answers: ParticipantAnswer[] }) => void;
+  'get-all-submissions': () => void;
+  'reveal-question': (data: { questionIndex: number }) => void;
+  'reveal-all': () => void;
+  'toggle-leaderboard-visibility': (data: { visible: boolean }) => void;
+  'get-leaderboard-status': () => void;
+  'send-announcement': (data: { message: string }) => void;
 }
 
 export interface InterServerEvents {

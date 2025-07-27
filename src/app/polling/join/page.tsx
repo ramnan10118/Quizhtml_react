@@ -3,8 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { io, Socket } from 'socket.io-client';
-import { Button } from '@/components/ui/Button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
+import { Button, Card, CardContent, CardHeader, CardTitle } from '@/components/ui'
 import { Header } from '@/components/layout/Header';
 // import { PollDisplay } from '@/components/polling/PollDisplay';
 import { usePollState } from '@/hooks/usePollState';

@@ -1,7 +1,6 @@
-import React from 'react';
-import { Button } from '@/components/ui/Button';
-import { cn } from '@/lib/utils';
-import { useHapticFeedback } from '@/hooks/useHapticFeedback';
+import * as React from 'react'
+import { Button, cn, QUIZ_VARIANTS } from '@/components/ui'
+import { useHapticFeedback } from '@/hooks/useHapticFeedback'
 
 interface BuzzerButtonProps {
   onBuzz: () => void;
@@ -31,8 +30,7 @@ export function BuzzerButton({ onBuzz, disabled = false, canBuzz = true, classNa
       )}
     >
       <Button
-        variant="buzz"
-        size="buzz"
+        {...QUIZ_VARIANTS.buzzer}
         onClick={handleBuzz}
         disabled={disabled || !canBuzz}
         className={cn(

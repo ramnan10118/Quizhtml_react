@@ -1,9 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
-import { Button } from '@/components/ui/Button';
-import { Input } from '@/components/ui/Input';
-import { PollCreateData } from '@/types/polling';
-import { cn } from '@/lib/utils';
+import * as React from 'react'
+import { Card, CardContent, CardHeader, CardTitle, Button, Input, cn } from '@/components/ui'
+import { PollCreateData } from '@/types/polling'
+
+const { useState, useEffect } = React
 
 interface PollCreatorProps {
   onCreatePoll: (data: PollCreateData) => void;

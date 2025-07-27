@@ -16,6 +16,25 @@ let buzzOrder = [];
 const teams = new Map();
 const scores = new Map();
 
+// New quiz modes state
+let quizMode = 'buzzer'; // 'buzzer' | 'basic' | 'scheduled'
+let quizSettings = {
+  mode: 'buzzer',
+  timeLimit: undefined,
+  allowRetakes: false,
+  showCorrectAnswers: true,
+  passingScore: undefined
+};
+
+// Basic mode state
+const basicSubmissions = new Map(); // socketId -> submission
+
+// Scheduled mode state  
+const scheduledSubmissions = new Map(); // socketId -> submission
+let revealedQuestions = []; // Array of {questionIndex, isRevealed, revealedAt}
+let leaderboardVisible = false;
+const announcements = []; // Array of {message, timestamp}
+
 // Polling state
 let currentPoll = null;
 let pollHistory = [];
@@ -155,6 +174,51 @@ let questions = [
   }
 ];
 
+// Helper functions
+function calculateLeaderboard() {
+  const leaderboard = [];
+  const revealedCount = revealedQuestions.filter(r => r.isRevealed).length;
+  
+  if (revealedCount === 0) {
+    return [];
+  }
+  
+  scheduledSubmissions.forEach((submission, socketId) => {
+    let score = 0;
+    
+    // Calculate score based on revealed questions only
+    submission.answers.forEach(answer => {
+      const questionRevealed = revealedQuestions[answer.questionIndex]?.isRevealed;
+      if (questionRevealed && answer.selectedOption === questions[answer.questionIndex]?.correct) {
+        score++;
+      }
+    });
+    
+    leaderboard.push({
+      rank: 0, // Will be set after sorting
+      participantName: submission.participantName,
+      score: score,
+      submissionTime: submission.submissionTime,
+      questionsRevealed: revealedCount
+    });
+  });
+  
+  // Sort by score (descending), then by submission time (ascending)
+  leaderboard.sort((a, b) => {
+    if (a.score === b.score) {
+      return a.submissionTime - b.submissionTime;
+    }
+    return b.score - a.score;
+  });
+  
+  // Assign ranks
+  leaderboard.forEach((entry, index) => {
+    entry.rank = index + 1;
+  });
+  
+  return leaderboard;
+}
+
 app.prepare().then(() => {
   const httpServer = createServer((req, res) => {
     const parsedUrl = parse(req.url, true);
@@ -185,6 +249,13 @@ app.prepare().then(() => {
       currentQuestion = 1;
       buzzOrder = [];
       
+      // Initialize reveal state for scheduled mode
+      revealedQuestions = questions.map((_, index) => ({
+        questionIndex: index,
+        isRevealed: false,
+        revealedAt: null
+      }));
+      
       // Send updated question to all clients
       io.emit('question-change', {
         questionNumber: currentQuestion,
@@ -192,10 +263,216 @@ app.prepare().then(() => {
       });
     });
 
+    // NEW MODE SELECTION EVENTS
+    socket.on('set-quiz-mode', (data) => {
+      console.log('Quiz mode set:', data.mode, 'with settings:', data.settings);
+      quizMode = data.mode;
+      quizSettings = { ...quizSettings, ...data.settings };
+      
+      // Reset state for new mode
+      if (data.mode === 'basic') {
+        basicSubmissions.clear();
+      } else if (data.mode === 'scheduled') {
+        scheduledSubmissions.clear();
+        revealedQuestions = questions.map((_, index) => ({
+          questionIndex: index,
+          isRevealed: false,
+          revealedAt: null
+        }));
+        leaderboardVisible = false;
+        announcements.length = 0;
+      }
+      
+      io.emit('quiz-mode-set', { mode: data.mode, settings: quizSettings });
+    });
+
+    // BASIC MODE EVENTS
+    socket.on('submit-basic-quiz', (data) => {
+      console.log('Basic quiz submitted by:', data.participantName);
+      
+      // Calculate score
+      let score = 0;
+      data.answers.forEach(answer => {
+        if (answer.selectedOption === questions[answer.questionIndex]?.correct) {
+          score++;
+        }
+      });
+      
+      const submission = {
+        participantName: data.participantName,
+        socketId: socket.id,
+        answers: data.answers,
+        submissionTime: Date.now(),
+        score: score,
+        isComplete: true
+      };
+      
+      basicSubmissions.set(socket.id, submission);
+      
+      // Send results back to participant
+      socket.emit('basic-quiz-submitted', { submission });
+      
+      // Notify host of new submission
+      io.emit('basic-quiz-submitted', submission);
+      io.emit('submission-received', { 
+        participantName: data.participantName, 
+        submissionTime: submission.submissionTime 
+      });
+      
+      // Update submission count
+      io.emit('submissions-count-update', { 
+        count: basicSubmissions.size, 
+        total: teams.size 
+      });
+    });
+
+    socket.on('get-submissions-count', () => {
+      socket.emit('submissions-count-update', { 
+        count: basicSubmissions.size, 
+        total: teams.size 
+      });
+    });
+
+    socket.on('get-results-summary', () => {
+      const submissions = Array.from(basicSubmissions.values());
+      socket.emit('results-summary', { submissions });
+    });
+
+    socket.on('quiz-settings-update', (data) => {
+      quizSettings = { ...quizSettings, ...data.settings };
+      io.emit('quiz-settings-updated', { settings: quizSettings });
+    });
+
+    // SCHEDULED MODE EVENTS
+    socket.on('submit-answers', (data) => {
+      console.log('Scheduled answers submitted by:', data.participantName);
+      
+      const submission = {
+        participantName: data.participantName,
+        socketId: socket.id,
+        answers: data.answers,
+        submissionTime: Date.now(),
+        score: 0, // Will be calculated during reveals
+        isComplete: true
+      };
+      
+      scheduledSubmissions.set(socket.id, submission);
+      
+      // Notify participant and host
+      socket.emit('submission-stored', { participantName: data.participantName });
+      io.emit('submission-received', { 
+        participantName: data.participantName, 
+        submissionTime: submission.submissionTime 
+      });
+    });
+
+    socket.on('reveal-question', (data) => {
+      const questionIndex = data.questionIndex;
+      if (questionIndex < 0 || questionIndex >= revealedQuestions.length) return;
+      
+      console.log('Revealing question:', questionIndex);
+      
+      revealedQuestions[questionIndex] = {
+        questionIndex,
+        isRevealed: true,
+        revealedAt: Date.now()
+      };
+      
+      // Calculate updated scores and leaderboard
+      const leaderboard = calculateLeaderboard();
+      
+      // Broadcast the reveal
+      io.emit('question-revealed', { 
+        questionIndex, 
+        correctAnswer: questions[questionIndex].correct 
+      });
+      
+      io.emit('leaderboard-updated', { 
+        leaderboard, 
+        visible: leaderboardVisible 
+      });
+    });
+
+    socket.on('reveal-all', () => {
+      console.log('Revealing all questions');
+      
+      revealedQuestions = revealedQuestions.map((r, index) => ({
+        questionIndex: index,
+        isRevealed: true,
+        revealedAt: Date.now()
+      }));
+      
+      const leaderboard = calculateLeaderboard();
+      
+      io.emit('all-questions-revealed', { leaderboard });
+      io.emit('leaderboard-updated', { 
+        leaderboard, 
+        visible: leaderboardVisible 
+      });
+    });
+
+    socket.on('toggle-leaderboard-visibility', (data) => {
+      leaderboardVisible = data.visible;
+      console.log('Leaderboard visibility:', leaderboardVisible);
+      
+      const leaderboard = calculateLeaderboard();
+      
+      io.emit('leaderboard-visibility-changed', { visible: leaderboardVisible });
+      io.emit('leaderboard-updated', { 
+        leaderboard, 
+        visible: leaderboardVisible 
+      });
+    });
+
+    socket.on('get-leaderboard-status', () => {
+      const leaderboard = calculateLeaderboard();
+      socket.emit('leaderboard-updated', { 
+        leaderboard, 
+        visible: leaderboardVisible 
+      });
+    });
+
+    socket.on('send-announcement', (data) => {
+      const announcement = {
+        message: data.message,
+        timestamp: Date.now()
+      };
+      
+      announcements.push(announcement);
+      
+      // Keep only last 10 announcements  
+      if (announcements.length > 10) {
+        announcements.shift();
+      }
+      
+      io.emit('announcement', announcement);
+    });
+
+    socket.on('get-all-submissions', () => {
+      const submissions = Array.from(scheduledSubmissions.values());
+      socket.emit('all-submissions', { submissions, revealedQuestions });
+    });
+
     socket.on('register-team', (data) => {
       console.log('Team registered:', data.teamName);
       teams.set(socket.id, data.teamName);
       scores.set(data.teamName, 0);
+      
+      // Send current quiz mode and questions to the new participant
+      socket.emit('quiz-mode-set', {
+        mode: quizMode,
+        settings: quizSettings,
+        questions: questions
+      });
+      
+      // Send current question only for buzzer mode
+      if (quizMode === 'buzzer') {
+        socket.emit('question-change', {
+          questionNumber: currentQuestion,
+          questionData: questions[currentQuestion - 1] || null
+        });
+      }
+      
       io.emit('register-team', { socketId: socket.id, teamName: data.teamName });
     });
 

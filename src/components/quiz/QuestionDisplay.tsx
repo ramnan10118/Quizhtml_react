@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
-import { Card, CardContent, CardHeader } from '@/components/ui/Card';
-import { Button } from '@/components/ui/Button';
-import { QuizQuestion } from '@/types/quiz';
-import { getOptionLabel, cn } from '@/lib/utils';
+import * as React from 'react'
+import { Card, CardContent, CardHeader, Button, cn } from '@/components/ui'
+import { QuizQuestion } from '@/types/quiz'
+import { getOptionLabel } from '@/lib/utils'
+
+const { useState } = React
 
 interface QuestionDisplayProps {
   questionNumber: number;
@@ -32,7 +33,7 @@ export function QuestionDisplay({
   if (!question) {
     return (
       <Card className={cn('w-full', className)}>
-        <CardContent className="p-8 text-center text-gray-500 dark:text-gray-400">
+        <CardContent className="p-8 text-center text-muted-foreground">
           Loading question...
         </CardContent>
       </Card>
@@ -55,7 +56,7 @@ export function QuestionDisplay({
   const canGoNext = totalQuestions ? questionNumber < totalQuestions : false;
 
   return (
-    <Card className={cn('w-full bg-gradient-to-br from-slate-50 to-slate-100 dark:from-dark-800 dark:to-dark-700 border-slate-200 dark:border-dark-600', className)}>
+    <Card className={cn('w-full bg-gradient-to-br from-card to-muted border-border', className)}>
       <CardHeader className="pb-2">
         <div className="space-y-1">
           <h2 className="text-lg sm:text-xl md:text-2xl font-medium text-slate-700 dark:text-gray-100">

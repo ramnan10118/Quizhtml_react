@@ -1,9 +1,10 @@
-'use client';
+'use client'
 
-import React, { useState } from 'react';
-import { Button } from '@/components/ui/Button';
-import { cn } from '@/lib/utils';
-import { ConnectionStatus as ConnectionStatusType } from '@/types/quiz';
+import * as React from 'react'
+import { Button, cn } from '@/components/ui'
+import { ConnectionStatus as ConnectionStatusType } from '@/types/quiz'
+
+const { useState } = React
 
 interface HamburgerMenuProps {
   connectionStatus?: ConnectionStatusType;
@@ -40,25 +41,25 @@ export function HamburgerMenu({
         onClick={toggleMenu}
         variant="ghost"
         size="icon"
-        className="relative w-10 h-10 p-0 hover:bg-gray-100 dark:hover:bg-dark-700"
+        className="relative w-10 h-10 p-0 hover:bg-accent hover:text-accent-foreground"
         aria-label="Menu"
       >
         <div className="w-5 h-5 flex flex-col justify-center items-center space-y-1">
           <span
             className={cn(
-              'block w-4 h-0.5 bg-gray-600 dark:bg-gray-300 transition-all duration-300 origin-center',
+              'block w-4 h-0.5 bg-foreground transition-all duration-300 origin-center',
               isOpen && 'rotate-45 translate-y-1'
             )}
           />
           <span
             className={cn(
-              'block w-4 h-0.5 bg-gray-600 dark:bg-gray-300 transition-all duration-300',
+              'block w-4 h-0.5 bg-foreground transition-all duration-300',
               isOpen && 'opacity-0'
             )}
           />
           <span
             className={cn(
-              'block w-4 h-0.5 bg-gray-600 dark:bg-gray-300 transition-all duration-300 origin-center',
+              'block w-4 h-0.5 bg-foreground transition-all duration-300 origin-center',
               isOpen && '-rotate-45 -translate-y-1'
             )}
           />
@@ -76,15 +77,15 @@ export function HamburgerMenu({
       {/* Slide-in Menu */}
       <div
         className={cn(
-          'fixed top-0 right-0 h-screen w-80 bg-white dark:bg-dark-800 shadow-2xl z-50',
-          'transform transition-transform duration-300 ease-in-out border-l border-gray-200 dark:border-dark-600',
+          'fixed top-0 right-0 h-screen w-80 bg-background shadow-2xl z-50',
+          'transform transition-transform duration-300 ease-in-out border-l border-border',
           isOpen ? 'translate-x-0' : 'translate-x-full'
         )}
       >
         <div className="p-6 h-full flex flex-col">
           {/* Header */}
           <div className="flex items-center justify-between mb-6">
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
+            <h2 className="text-xl font-semibold text-foreground">
               Menu
             </h2>
             <Button
@@ -93,7 +94,7 @@ export function HamburgerMenu({
               size="icon"
               className="w-8 h-8 p-0"
             >
-              <span className="text-xl text-gray-500 dark:text-gray-400">×</span>
+              <span className="text-xl text-muted-foreground">×</span>
             </Button>
           </div>
 
@@ -108,7 +109,7 @@ export function HamburgerMenu({
                       'w-2 h-2 rounded-full',
                       connectionStatus.isConnected ? 'bg-green-500' : 'bg-red-500'
                     )} />
-                    <span className="text-sm text-gray-700 dark:text-gray-300">
+                    <span className="text-sm text-foreground">
                       {connectionStatus.connectionMessage}
                     </span>
                   </div>
@@ -118,10 +119,10 @@ export function HamburgerMenu({
               {/* Team Scores Section */}
               {teamScores.length > 0 && (
                 <div>
-                  <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                  <h3 className="text-sm font-medium text-foreground mb-3">
                     Team Scores
                   </h3>
-                  <div className="bg-gray-50 dark:bg-dark-700 rounded-lg p-4">
+                  <div className="bg-muted rounded-lg p-4">
                     <div className="space-y-3">
                       {teamScores
                         .sort((a, b) => b.score - a.score)
@@ -131,14 +132,14 @@ export function HamburgerMenu({
                             className="flex items-center justify-between"
                           >
                             <div className="flex items-center space-x-3">
-                              <span className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                              <span className="text-sm font-medium text-muted-foreground">
                                 #{index + 1}
                               </span>
-                              <span className="font-medium text-gray-900 dark:text-gray-100">
+                              <span className="font-medium text-foreground">
                                 {team.name}
                               </span>
                             </div>
-                            <span className="text-sm font-semibold text-blue-600 dark:text-blue-400">
+                            <span className="text-sm font-semibold text-primary">
                               {team.score}
                             </span>
                           </div>
@@ -151,7 +152,7 @@ export function HamburgerMenu({
 
             {/* Quit Session Button - Bottom */}
             {isRegistered && onQuitSession && (
-              <div className="pt-4 border-t border-gray-200 dark:border-dark-600">
+              <div className="pt-4 border-t border-border">
                 <Button
                   onClick={handleQuitSession}
                   variant="destructive"

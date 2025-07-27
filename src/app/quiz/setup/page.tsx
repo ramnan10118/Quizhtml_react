@@ -2,10 +2,8 @@
 
 import React, { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Header } from '@/components/layout/Header';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
-import { Button } from '@/components/ui/Button';
-import { Input } from '@/components/ui/Input';
+import { Header } from '@/components/layout/Header'
+import { Card, CardContent, CardHeader, CardTitle, Button, Input } from '@/components/ui'
 import { QuizQuestion } from '@/types/quiz';
 import { quizDrafts } from '@/lib/drafts';
 import { useAuth } from '@/contexts/AuthContext';
@@ -257,6 +255,23 @@ function QuizSetupContent() {
 
   const handleLaunchQuiz = () => {
     sessionStorage.setItem('customQuestions', JSON.stringify(questions));
+    
+    // Ensure mode and settings are preserved if they were set during mode selection
+    const existingMode = sessionStorage.getItem('selectedQuizMode');
+    const existingSettings = sessionStorage.getItem('selectedQuizSettings');
+    
+    if (!existingMode) {
+      // Default to buzzer mode if no mode was selected
+      sessionStorage.setItem('selectedQuizMode', 'buzzer');
+      sessionStorage.setItem('selectedQuizSettings', JSON.stringify({
+        mode: 'buzzer',
+        timeLimit: undefined,
+        allowRetakes: false,
+        showCorrectAnswers: true,
+        passingScore: undefined
+      }));
+    }
+    
     router.push('/quiz/host');
   };
 

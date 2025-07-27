@@ -17,6 +17,7 @@ const getCustomQuestions = (): QuizQuestion[] => {
 };
 
 const initialState: QuizState = {
+  mode: 'buzzer',
   currentQuestion: 1,
   totalQuestions: 0, // Will be set after questions are loaded
   currentQuestionData: null,
@@ -26,6 +27,20 @@ const initialState: QuizState = {
   rankings: [],
   canBuzz: false,
   isHost: false,
+  settings: {
+    mode: 'buzzer',
+    timeLimit: undefined,
+    allowRetakes: false,
+    showCorrectAnswers: true,
+    passingScore: undefined
+  },
+  basicSubmissions: [],
+  scheduledState: {
+    submissions: [],
+    revealedQuestions: [],
+    leaderboardVisible: false,
+    isComplete: false
+  }
 };
 
 export function useQuizState(isHost: boolean = false) {
