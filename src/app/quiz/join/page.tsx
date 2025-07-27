@@ -11,7 +11,7 @@ import { ScheduledQuizInterface } from '@/components/quiz/ScheduledQuizInterface
 import { useSocket } from '@/hooks/useSocket';
 import { useQuizState } from '@/hooks/useQuizState';
 import { useHapticFeedback } from '@/hooks/useHapticFeedback';
-import { QuizMode, QuizQuestion, QuizSettings } from '@/types/quiz';
+import { QuizMode, QuizQuestion, QuizSettings, RevealState, LeaderboardEntry } from '@/types/quiz';
 import confetti from 'canvas-confetti';
 
 export default function JoinPage() {
@@ -38,6 +38,12 @@ export default function JoinPage() {
   // Submission states
   const [isQuizSubmitted, setIsQuizSubmitted] = useState(false);
   
+  // Scheduled mode specific state
+  const [revealedQuestions, setRevealedQuestions] = useState<RevealState[]>([]);
+  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
+  const [leaderboardVisible, setLeaderboardVisible] = useState(false);
+  const [announcements, setAnnouncements] = useState<Array<{ message: string; timestamp: number }>>([]);
+  
   const { success, error, connectionChange } = useHapticFeedback();
 
   useEffect(() => {
@@ -51,7 +57,18 @@ export default function JoinPage() {
     socket.on('quiz-mode-set', (data: { mode: QuizMode; settings: QuizSettings; questions?: QuizQuestion[] }) => {
       setQuizMode(data.mode);
       setQuizSettings(data.settings || {});
-      setQuestions(data.questions || []);
+      const receivedQuestions = data.questions || [];
+      setQuestions(receivedQuestions);
+      
+      // Initialize revealed questions state for scheduled mode
+      if (data.mode === 'scheduled' && receivedQuestions.length > 0) {
+        setRevealedQuestions(receivedQuestions.map((_: QuizQuestion, index: number) => ({
+          questionIndex: index,
+          isRevealed: false,
+          revealedAt: undefined
+        })));
+      }
+      
       console.log('Quiz mode set to:', data.mode);
     });
 
@@ -143,12 +160,32 @@ export default function JoinPage() {
 
     socket.on('question-revealed', (data: { questionIndex: number; correctAnswer: number }) => {
       console.log('Question revealed:', data);
-      // Update revealed questions state
+      setRevealedQuestions(prev => 
+        prev.map((q, index) => 
+          index === data.questionIndex 
+            ? { ...q, isRevealed: true, revealedAt: Date.now() }
+            : q
+        )
+      );
+    });
+
+    socket.on('all-questions-revealed', (data: { leaderboard: LeaderboardEntry[] }) => {
+      console.log('All questions revealed:', data);
+      setRevealedQuestions(prev => 
+        prev.map(q => ({ ...q, isRevealed: true, revealedAt: Date.now() }))
+      );
+      setLeaderboard(data.leaderboard);
     });
 
     socket.on('leaderboard-updated', (data: { leaderboard: Array<{ rank: number; participantName: string; score: number; submissionTime: number; questionsRevealed: number }>; visible: boolean }) => {
       console.log('Leaderboard updated for participant:', data);
-      // Update leaderboard display
+      setLeaderboard(data.leaderboard);
+      setLeaderboardVisible(data.visible);
+    });
+
+    socket.on('announcement', (data: { message: string; timestamp: number }) => {
+      console.log('Announcement received:', data);
+      setAnnouncements(prev => [...prev, data]);
     });
 
 
@@ -169,7 +206,9 @@ export default function JoinPage() {
       socket.off('submission-received');
       socket.off('submission-stored');
       socket.off('question-revealed');
+      socket.off('all-questions-revealed');
       socket.off('leaderboard-updated');
+      socket.off('announcement');
     };
   }, [socket, updateCurrentQuestion, setSinglePlayerBuzzState, success, error, connectionChange, isRegistered, teamName, router]);
 
@@ -286,6 +325,10 @@ export default function JoinPage() {
                 <ScheduledQuizInterface
                   questions={questions}
                   participantName={teamName}
+                  revealedQuestions={revealedQuestions}
+                  leaderboard={leaderboard}
+                  leaderboardVisible={leaderboardVisible}
+                  announcements={announcements}
                   onSubmitAnswers={(answers) => {
                     console.log('Scheduled quiz submitted:', answers);
                     setIsQuizSubmitted(true);

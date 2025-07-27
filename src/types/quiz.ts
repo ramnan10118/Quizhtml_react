@@ -128,12 +128,15 @@ export interface ServerToClientEvents {
   'quiz-mode-set': (data: { mode: QuizMode; settings: QuizSettings }) => void;
   
   // Basic mode events
+  'basic-quiz-submitted': (submission: ParticipantSubmission) => void;
   'submission-received': (data: { participantName: string; submissionTime: number }) => void;
   'submissions-count-update': (data: { count: number; total: number }) => void;
+  'results-summary': (data: { submissions: ParticipantSubmission[] }) => void;
   'quiz-results': (data: { submission: ParticipantSubmission }) => void;
   
   // Scheduled mode events
   'submission-stored': (data: { participantName: string }) => void;
+  'all-submissions': (data: { submissions: ParticipantSubmission[]; revealedQuestions: RevealState[] }) => void;
   'question-revealed': (data: { questionIndex: number; correctAnswer: number }) => void;
   'all-questions-revealed': (data: { leaderboard: LeaderboardEntry[] }) => void;
   'leaderboard-updated': (data: { leaderboard: LeaderboardEntry[]; visible: boolean }) => void;

@@ -12,7 +12,7 @@ import { Button } from '@/components/ui/Button';
 import { ModeAwareHostDashboard } from '@/components/host/ModeAwareHostDashboard';
 import { useSocket } from '@/hooks/useSocket';
 import { useQuizState } from '@/hooks/useQuizState';
-import { QuizMode, QuizSettings, QUIZ_QUESTIONS, ParticipantSubmission, RevealState, LeaderboardEntry } from '@/types/quiz';
+import { QuizMode, QuizSettings, QUIZ_QUESTIONS, ParticipantSubmission, RevealState, LeaderboardEntry, QuizQuestion } from '@/types/quiz';
 
 export default function HostPage() {
   const router = useRouter();
@@ -46,7 +46,7 @@ export default function HostPage() {
   const [participants] = useState<Array<{ name: string; socketId: string }>>([]);
   const [basicSubmissions, setBasicSubmissions] = useState<ParticipantSubmission[]>([]);
   const [scheduledSubmissions, setScheduledSubmissions] = useState<ParticipantSubmission[]>([]);
-  const [revealedQuestions] = useState<RevealState[]>([]);
+  const [revealedQuestions, setRevealedQuestions] = useState<RevealState[]>([]);
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [leaderboardVisible, setLeaderboardVisible] = useState(false);
 
@@ -70,10 +70,26 @@ export default function HostPage() {
     
     if (customQuestions) {
       try {
-        setQuestions(JSON.parse(customQuestions));
+        const parsedQuestions = JSON.parse(customQuestions);
+        setQuestions(parsedQuestions);
+        // Initialize revealed questions state for scheduled mode
+        if (savedMode === 'scheduled') {
+          setRevealedQuestions(parsedQuestions.map((_: QuizQuestion, index: number) => ({
+            questionIndex: index,
+            isRevealed: false,
+            revealedAt: undefined
+          })));
+        }
       } catch (e) {
         console.error('Error parsing custom questions:', e);
       }
+    } else if (savedMode === 'scheduled') {
+      // Initialize with default questions if no custom questions
+      setRevealedQuestions(QUIZ_QUESTIONS.map((_: QuizQuestion, index: number) => ({
+        questionIndex: index,
+        isRevealed: false,
+        revealedAt: undefined
+      })));
     }
   }, []);
 
@@ -115,15 +131,50 @@ export default function HostPage() {
     });
 
     // Basic mode events
+    socket.on('basic-quiz-submitted', (submission: ParticipantSubmission) => {
+      console.log('Basic quiz submission received:', submission);
+      setBasicSubmissions(prev => [...prev, submission]);
+    });
+
     socket.on('submission-received', (data: { participantName: string; submissionTime: number }) => {
-      console.log('Basic quiz submission received:', data);
-      // For now, just update count - we'll get the full submission data from another event
+      console.log('Quiz submission notification:', data);
+      // This is just a notification event - actual data comes from specific mode events
     });
 
     // Scheduled mode events
-    socket.on('submission-received', (data: { participantName: string; submissionTime: number }) => {
-      console.log('Scheduled submission received:', data);
-      // For now, just update count - we'll get the full submission data from another event
+    socket.on('submission-stored', (data: { participantName: string }) => {
+      console.log('Scheduled submission stored:', data);
+      // For scheduled mode, we'll get full data when questions are revealed
+    });
+
+    socket.on('all-submissions', (data: { submissions: ParticipantSubmission[]; revealedQuestions: RevealState[] }) => {
+      console.log('All scheduled submissions received:', data);
+      setScheduledSubmissions(data.submissions);
+      setRevealedQuestions(data.revealedQuestions);
+    });
+
+    socket.on('results-summary', (data: { submissions: ParticipantSubmission[] }) => {
+      console.log('Basic quiz results summary received:', data);
+      setBasicSubmissions(data.submissions);
+    });
+
+    socket.on('question-revealed', (data: { questionIndex: number; correctAnswer: number }) => {
+      console.log('Question revealed:', data);
+      setRevealedQuestions(prev => 
+        prev.map((q, index) => 
+          index === data.questionIndex 
+            ? { ...q, isRevealed: true, revealedAt: Date.now() }
+            : q
+        )
+      );
+    });
+
+    socket.on('all-questions-revealed', (data: { leaderboard: LeaderboardEntry[] }) => {
+      console.log('All questions revealed:', data);
+      setRevealedQuestions(prev => 
+        prev.map(q => ({ ...q, isRevealed: true, revealedAt: Date.now() }))
+      );
+      setLeaderboard(data.leaderboard);
     });
 
     socket.on('leaderboard-updated', (data: { leaderboard: Array<{ rank: number; participantName: string; score: number; submissionTime: number; questionsRevealed: number }>; visible: boolean }) => {
@@ -136,10 +187,42 @@ export default function HostPage() {
       socket.off('register-team');
       socket.off('disconnect-team');
       socket.off('buzz');
+      socket.off('basic-quiz-submitted');
       socket.off('submission-received');
+      socket.off('submission-stored');
+      socket.off('all-submissions');
+      socket.off('results-summary');
+      socket.off('question-revealed');
+      socket.off('all-questions-revealed');
       socket.off('leaderboard-updated');
     };
   }, [socket, addTeam, removeTeam, addBuzz, currentMode, currentSettings]);
+
+  // Request initial data when mode changes
+  useEffect(() => {
+    if (socket && currentMode) {
+      // Small delay to ensure mode is set on server
+      setTimeout(() => {
+        if (currentMode === 'basic') {
+          socket.emit('get-results-summary');
+        } else if (currentMode === 'scheduled') {
+          socket.emit('get-all-submissions');
+          socket.emit('get-leaderboard-status');
+        }
+      }, 500);
+    }
+  }, [socket, currentMode]);
+
+  // Initialize revealed questions when mode changes to scheduled
+  useEffect(() => {
+    if (currentMode === 'scheduled' && questions.length > 0 && revealedQuestions.length === 0) {
+      setRevealedQuestions(questions.map((_: QuizQuestion, index: number) => ({
+        questionIndex: index,
+        isRevealed: false,
+        revealedAt: undefined
+      })));
+    }
+  }, [currentMode, questions, revealedQuestions.length]);
 
   const handleQuestionChange = (direction: 'next' | 'prev') => {
     const newQuestionNumber = changeQuestion(direction);
@@ -247,8 +330,15 @@ export default function HostPage() {
   };
 
   const handleRefreshData = () => {
-    // TODO: Implement data refresh logic
     console.log('Refreshing data');
+    if (socket) {
+      if (currentMode === 'basic') {
+        socket.emit('get-results-summary');
+      } else if (currentMode === 'scheduled') {
+        socket.emit('get-all-submissions');
+        socket.emit('get-leaderboard-status');
+      }
+    }
   };
 
   // Calculate participant and submission counts
