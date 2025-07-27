@@ -157,6 +157,7 @@ export interface ClientToServerEvents {
   'set-quiz-mode': (data: { mode: QuizMode; settings: QuizSettings }) => void;
   
   // Basic mode events
+  'submit-basic-quiz': (data: { participantName: string; answers: ParticipantAnswer[] }) => void;
   'submit-quiz': (data: { participantName: string; answers: ParticipantAnswer[] }) => void;
   'get-submissions-count': () => void;
   'get-submissions-list': () => void;
@@ -165,6 +166,7 @@ export interface ClientToServerEvents {
   
   // Scheduled mode events  
   'submit-answers': (data: { participantName: string; answers: ParticipantAnswer[] }) => void;
+  'submit-scheduled-quiz': (data: { participantName: string; answers: ParticipantAnswer[] }) => void;
   'get-all-submissions': () => void;
   'reveal-question': (data: { questionIndex: number }) => void;
   'reveal-all': () => void;

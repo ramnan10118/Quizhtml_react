@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle, Button, cn } from '@/componen
 import { QuizQuestion, ParticipantAnswer } from '@/types/quiz'
 import { getOptionLabel } from '@/lib/utils'
 
-const { useState, useEffect } = React
+const { useState, useEffect, useCallback } = React
 
 interface BasicQuizInterfaceProps {
   questions: QuizQuestion[]
@@ -36,6 +36,39 @@ export function BasicQuizInterface({
   const [isCompleted, setIsCompleted] = useState(false)
   const [finalScore, setFinalScore] = useState(0)
 
+  const handleSubmit = useCallback(async () => {
+    if (isSubmitting) return
+    
+    setIsSubmitting(true)
+    
+    // Fill in any missing answers with -1 (no answer)
+    const completeAnswers: ParticipantAnswer[] = questions.map((_, index) => {
+      const existingAnswer = progress.answers.find(a => a.questionIndex === index)
+      return existingAnswer || {
+        questionIndex: index,
+        selectedOption: -1,
+        timestamp: Date.now()
+      }
+    })
+
+    try {
+      // Calculate score locally
+      const score = completeAnswers.filter((answer, index) => 
+        answer.selectedOption === questions[index]?.correct
+      ).length
+      setFinalScore(score)
+      
+      onComplete(completeAnswers)
+      // Clear saved progress
+      const saveKey = `quiz-progress-${participantName}`
+      localStorage.removeItem(saveKey)
+      setIsCompleted(true)
+    } catch (error) {
+      console.error('Failed to submit quiz:', error)
+      setIsSubmitting(false)
+    }
+  }, [isSubmitting, questions, progress.answers, onComplete, participantName])
+
   // Timer effect
   useEffect(() => {
     if (!timeLimit || progress.timeRemaining === undefined || progress.timeRemaining <= 0) return
@@ -52,7 +85,7 @@ export function BasicQuizInterface({
     }, 1000)
 
     return () => clearInterval(timer)
-  }, [progress.timeRemaining, timeLimit])
+  }, [progress.timeRemaining, timeLimit, handleSubmit])
 
   // Save progress to localStorage
   useEffect(() => {
@@ -76,7 +109,6 @@ export function BasicQuizInterface({
 
   const currentQuestion = questions[progress.currentQuestionIndex]
   const isLastQuestion = progress.currentQuestionIndex === questions.length - 1
-  const hasAnsweredCurrent = progress.answers.some(a => a.questionIndex === progress.currentQuestionIndex)
 
   const handleAnswer = (selectedOption: number) => {
     const newAnswer: ParticipantAnswer = {
@@ -109,39 +141,6 @@ export function BasicQuizInterface({
         ...prev,
         currentQuestionIndex: prev.currentQuestionIndex - 1
       }))
-    }
-  }
-
-  const handleSubmit = async () => {
-    if (isSubmitting) return
-    
-    setIsSubmitting(true)
-    
-    // Fill in any missing answers with -1 (no answer)
-    const completeAnswers: ParticipantAnswer[] = questions.map((_, index) => {
-      const existingAnswer = progress.answers.find(a => a.questionIndex === index)
-      return existingAnswer || {
-        questionIndex: index,
-        selectedOption: -1,
-        timestamp: Date.now()
-      }
-    })
-
-    try {
-      // Calculate score locally
-      const score = completeAnswers.filter((answer, index) => 
-        answer.selectedOption === questions[index]?.correct
-      ).length
-      setFinalScore(score)
-      
-      onComplete(completeAnswers)
-      // Clear saved progress
-      const saveKey = `quiz-progress-${participantName}`
-      localStorage.removeItem(saveKey)
-      setIsCompleted(true)
-    } catch (error) {
-      console.error('Failed to submit quiz:', error)
-      setIsSubmitting(false)
     }
   }
 

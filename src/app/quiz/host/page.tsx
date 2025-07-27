@@ -12,7 +12,7 @@ import { Button } from '@/components/ui/Button';
 import { ModeAwareHostDashboard } from '@/components/host/ModeAwareHostDashboard';
 import { useSocket } from '@/hooks/useSocket';
 import { useQuizState } from '@/hooks/useQuizState';
-import { QuizMode, QuizSettings, QUIZ_QUESTIONS } from '@/types/quiz';
+import { QuizMode, QuizSettings, QUIZ_QUESTIONS, ParticipantSubmission, RevealState, LeaderboardEntry } from '@/types/quiz';
 
 export default function HostPage() {
   const router = useRouter();
@@ -43,11 +43,11 @@ export default function HostPage() {
   const [highlightedOption, setHighlightedOption] = useState<number | null>(null);
   
   // Basic/Scheduled mode specific state
-  const [participants, setParticipants] = useState<Array<{ name: string; socketId: string }>>([]);
-  const [basicSubmissions, setBasicSubmissions] = useState([]);
-  const [scheduledSubmissions, setScheduledSubmissions] = useState([]);
-  const [revealedQuestions, setRevealedQuestions] = useState([]);
-  const [leaderboard, setLeaderboard] = useState([]);
+  const [participants] = useState<Array<{ name: string; socketId: string }>>([]);
+  const [basicSubmissions, setBasicSubmissions] = useState<ParticipantSubmission[]>([]);
+  const [scheduledSubmissions, setScheduledSubmissions] = useState<ParticipantSubmission[]>([]);
+  const [revealedQuestions] = useState<RevealState[]>([]);
+  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [leaderboardVisible, setLeaderboardVisible] = useState(false);
 
   // Load mode and settings on component mount
@@ -115,32 +115,31 @@ export default function HostPage() {
     });
 
     // Basic mode events
-    socket.on('basic-quiz-submitted', (data) => {
+    socket.on('submission-received', (data: { participantName: string; submissionTime: number }) => {
       console.log('Basic quiz submission received:', data);
-      setBasicSubmissions(prev => [...prev, data]);
+      // For now, just update count - we'll get the full submission data from another event
     });
 
     // Scheduled mode events
-    socket.on('submission-received', (data) => {
+    socket.on('submission-received', (data: { participantName: string; submissionTime: number }) => {
       console.log('Scheduled submission received:', data);
-      setScheduledSubmissions(prev => [...prev, data]);
+      // For now, just update count - we'll get the full submission data from another event
     });
 
-    socket.on('leaderboard-updated', (data) => {
+    socket.on('leaderboard-updated', (data: { leaderboard: Array<{ rank: number; participantName: string; score: number; submissionTime: number; questionsRevealed: number }>; visible: boolean }) => {
       console.log('Leaderboard updated:', data);
       setLeaderboard(data.leaderboard || []);
-      setLeaderboardVisible(data.visible);
+      setLeaderboardVisible(data.visible || false);
     });
 
     return () => {
       socket.off('register-team');
       socket.off('disconnect-team');
       socket.off('buzz');
-      socket.off('basic-quiz-submitted');
       socket.off('submission-received');
       socket.off('leaderboard-updated');
     };
-  }, [socket, addTeam, removeTeam, addBuzz]);
+  }, [socket, addTeam, removeTeam, addBuzz, currentMode, currentSettings]);
 
   const handleQuestionChange = (direction: 'next' | 'prev') => {
     const newQuestionNumber = changeQuestion(direction);

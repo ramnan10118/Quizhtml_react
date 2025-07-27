@@ -11,7 +11,7 @@ import { ScheduledQuizInterface } from '@/components/quiz/ScheduledQuizInterface
 import { useSocket } from '@/hooks/useSocket';
 import { useQuizState } from '@/hooks/useQuizState';
 import { useHapticFeedback } from '@/hooks/useHapticFeedback';
-import { QuizMode } from '@/types/quiz';
+import { QuizMode, QuizQuestion, QuizSettings } from '@/types/quiz';
 import confetti from 'canvas-confetti';
 
 export default function JoinPage() {
@@ -32,12 +32,11 @@ export default function JoinPage() {
   
   // Quiz mode detection (to be received from host)
   const [quizMode, setQuizMode] = useState<QuizMode>('buzzer');
-  const [questions, setQuestions] = useState([]);
+  const [questions, setQuestions] = useState<QuizQuestion[]>([]);
   const [quizSettings, setQuizSettings] = useState<{ timeLimit?: number }>({});
   
   // Submission states
   const [isQuizSubmitted, setIsQuizSubmitted] = useState(false);
-  const [submissionConfirmed, setSubmissionConfirmed] = useState(false);
   
   const { success, error, connectionChange } = useHapticFeedback();
 
@@ -49,7 +48,7 @@ export default function JoinPage() {
     if (!socket) return;
 
     // Socket event listeners
-    socket.on('quiz-mode-set', (data) => {
+    socket.on('quiz-mode-set', (data: { mode: QuizMode; settings: QuizSettings; questions?: QuizQuestion[] }) => {
       setQuizMode(data.mode);
       setQuizSettings(data.settings || {});
       setQuestions(data.questions || []);
@@ -133,23 +132,21 @@ export default function JoinPage() {
     });
 
     // Basic mode events
-    socket.on('basic-quiz-submitted', (data) => {
+    socket.on('submission-received', (data: { participantName: string; submissionTime: number }) => {
       console.log('Basic quiz submission confirmed:', data);
-      setSubmissionConfirmed(true);
     });
 
     // Scheduled mode events
-    socket.on('submission-stored', (data) => {
+    socket.on('submission-stored', (data: { participantName: string }) => {
       console.log('Scheduled submission confirmed:', data);
-      setSubmissionConfirmed(true);
     });
 
-    socket.on('question-revealed', (data) => {
+    socket.on('question-revealed', (data: { questionIndex: number; correctAnswer: number }) => {
       console.log('Question revealed:', data);
       // Update revealed questions state
     });
 
-    socket.on('leaderboard-updated', (data) => {
+    socket.on('leaderboard-updated', (data: { leaderboard: Array<{ rank: number; participantName: string; score: number; submissionTime: number; questionsRevealed: number }>; visible: boolean }) => {
       console.log('Leaderboard updated for participant:', data);
       // Update leaderboard display
     });
@@ -169,7 +166,7 @@ export default function JoinPage() {
       socket.off('answer-revealed');
       socket.off('celebrate');
       socket.off('quiz-ended');
-      socket.off('basic-quiz-submitted');
+      socket.off('submission-received');
       socket.off('submission-stored');
       socket.off('question-revealed');
       socket.off('leaderboard-updated');
