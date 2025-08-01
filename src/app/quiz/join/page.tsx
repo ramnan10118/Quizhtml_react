@@ -244,12 +244,47 @@ export default function JoinPage() {
     }
   };
 
+  const handleExitQuiz = () => {
+    if (confirm('Are you sure you want to exit the quiz?')) {
+      // Clear participant data
+      setTeamName('');
+      setIsRegistered(false);
+      setInputName('');
+      setIsQuizSubmitted(false);
+      setSinglePlayerBuzzState(false);
+      
+      // Clear scheduled mode state
+      setRevealedQuestions([]);
+      setLeaderboard([]);
+      setLeaderboardVisible(false);
+      setAnnouncements([]);
+      
+      // Disconnect from socket gracefully
+      if (socket) {
+        socket.disconnect();
+      }
+      
+      // Redirect to mode selection
+      router.push('/mode');
+    }
+  };
+
   return (
     <div className={`min-h-screen flex flex-col bg-gray-50 dark:bg-dark-900 dark ${isCelebrating ? 'celebrating' : ''}`}>
       <Header 
         title="Quiz Participant" 
         subtitle={isMounted && teamName ? `Team: ${teamName}` : 'Join the Quiz'}
-      />
+      >
+        {isRegistered && teamName && (
+          <Button
+            onClick={handleExitQuiz}
+            variant="destructive"
+            size="sm"
+          >
+            Exit Quiz
+          </Button>
+        )}
+      </Header>
       
       {/* Welcome Message */}
       {isRegistered && teamName && (
