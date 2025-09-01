@@ -1,5 +1,8 @@
 import { useState, useCallback, useEffect } from 'react';
-import { QuizState, QuizQuestion, RankingData, QUIZ_QUESTIONS } from '@/types/quiz';
+import { QuizState, QuizQuestion, RankingData } from '@/types/quiz';
+
+// Module-level variable to track current session ID for saving
+let savedSessionIdForPersistence: string | null = null;
 
 // Get custom questions from sessionStorage if available
 const getCustomQuestions = (): QuizQuestion[] => {
@@ -7,13 +10,78 @@ const getCustomQuestions = (): QuizQuestion[] => {
     const stored = sessionStorage.getItem('customQuestions');
     if (stored) {
       try {
-        return JSON.parse(stored);
+        const parsed = JSON.parse(stored);
+        return Array.isArray(parsed) ? parsed : [];
       } catch (e) {
         console.error('Error parsing custom questions:', e);
+        return [];
       }
     }
   }
-  return QUIZ_QUESTIONS;
+  return []; // No fallback questions - questions come from database/API
+};
+
+// Save quiz state to localStorage
+const saveQuizState = (state: QuizState, sessionId?: string) => {
+  if (typeof window !== 'undefined' && state.isHost) {
+    try {
+      const stateToSave = {
+        teams: Array.from(state.teams.entries()),
+        scores: Array.from(state.scores.entries()),
+        buzzOrder: state.buzzOrder,
+        rankings: state.rankings,
+        currentQuestion: state.currentQuestion,
+        mode: state.mode,
+        settings: state.settings,
+        sessionId: sessionId,
+        timestamp: Date.now()
+      };
+      console.log('💾 Saving to localStorage with sessionId:', sessionId, 'Full state:', stateToSave);
+      localStorage.setItem('buzzer_quiz_state', JSON.stringify(stateToSave));
+      
+      // Verify save immediately
+      const saved = localStorage.getItem('buzzer_quiz_state');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        console.log('✅ Verified localStorage save - sessionId in storage:', parsed.sessionId);
+      }
+    } catch (e) {
+      console.error('Error saving quiz state:', e);
+    }
+  }
+};
+
+// Get saved quiz state from localStorage
+const getSavedQuizState = (): { state: Partial<QuizState>; sessionId: string | null } | null => {
+  if (typeof window !== 'undefined') {
+    try {
+      const stored = localStorage.getItem('buzzer_quiz_state');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        // Check if state is not too old (2 hours)
+        if (Date.now() - parsed.timestamp < 2 * 60 * 60 * 1000) {
+          return {
+            state: {
+              teams: new Map(parsed.teams || []),
+              scores: new Map(parsed.scores || []),
+              buzzOrder: parsed.buzzOrder || [],
+              rankings: parsed.rankings || [],
+              currentQuestion: parsed.currentQuestion || 1,
+              mode: parsed.mode || 'buzzer',
+              settings: parsed.settings || initialState.settings
+            },
+            sessionId: parsed.sessionId || null
+          };
+        } else {
+          localStorage.removeItem('buzzer_quiz_state');
+        }
+      }
+    } catch (e) {
+      console.error('Error loading saved quiz state:', e);
+      localStorage.removeItem('buzzer_quiz_state');
+    }
+  }
+  return null;
 };
 
 const initialState: QuizState = {
@@ -45,21 +113,63 @@ const initialState: QuizState = {
 
 export function useQuizState(isHost: boolean = false) {
   const [questions, setQuestions] = useState<QuizQuestion[]>([]);
-  const [quizState, setQuizState] = useState<QuizState>({
-    ...initialState,
-    isHost,
+  const [isHydrated, setIsHydrated] = useState(false);
+  
+  // Get saved data only after hydration
+  const savedData = isHydrated && isHost ? getSavedQuizState() : null;
+  const savedSessionId = savedData?.sessionId || null;
+  
+  const [quizState, setQuizState] = useState<QuizState>(() => {
+    return {
+      ...initialState,
+      isHost,
+    };
   });
+
+  // Apply saved state after hydration to prevent SSR mismatch
+  useEffect(() => {
+    console.log('📊 useQuizState hydration effect - isHost:', isHost);
+    setIsHydrated(true);
+    if (isHost) {
+      const savedData = getSavedQuizState();
+      if (savedData?.state) {
+        console.log('💾 Restoring saved quiz state:', {
+          teams: savedData.state.teams?.size || 0,
+          scores: savedData.state.scores?.size || 0,
+          currentQuestion: savedData.state.currentQuestion,
+          mode: savedData.state.mode
+        });
+        setQuizState(prev => ({
+          ...prev,
+          ...savedData.state,
+        }));
+      } else {
+        console.log('ℹ️ No saved quiz state found');
+      }
+    }
+  }, [isHost]);
 
   // Initialize questions on component mount
   useEffect(() => {
-    const customQuestions = getCustomQuestions();
+    const customQuestions = getCustomQuestions() || [];
     setQuestions(customQuestions);
     setQuizState(prev => ({
       ...prev,
       totalQuestions: customQuestions.length,
-      currentQuestionData: customQuestions[0] || null,
+      currentQuestionData: customQuestions[prev.currentQuestion - 1] || customQuestions[0] || null,
     }));
   }, []);
+
+  // Save state to localStorage whenever it changes (only for hosts)
+  // NOTE: Disabled automatic saves to prevent overwriting sessionId
+  // Session saves are now handled explicitly via saveCurrentSession()
+  /*
+  useEffect(() => {
+    if (isHost) {
+      saveQuizState(quizState);
+    }
+  }, [quizState, isHost]);
+  */
 
   const updateCurrentQuestion = useCallback((questionNumber: number, questionData: QuizQuestion) => {
     setQuizState(prev => ({
@@ -73,6 +183,7 @@ export function useQuizState(isHost: boolean = false) {
   }, [isHost]);
 
   const addTeam = useCallback((socketId: string, teamName: string) => {
+    console.log('👥 Adding team:', teamName, 'socketId:', socketId);
     setQuizState(prev => {
       const newTeams = new Map(prev.teams);
       const newScores = new Map(prev.scores);
@@ -80,11 +191,21 @@ export function useQuizState(isHost: boolean = false) {
       if (!newScores.has(teamName)) {
         newScores.set(teamName, 0);
       }
-      return {
+      const newState = {
         ...prev,
         teams: newTeams,
         scores: newScores,
       };
+      
+      // Save immediately after state change
+      setTimeout(() => {
+        if (savedSessionIdForPersistence) {
+          console.log('💾 Auto-saving after team added');
+          saveQuizState(newState, savedSessionIdForPersistence);
+        }
+      }, 0);
+      
+      return newState;
     });
   }, []);
 
@@ -108,6 +229,7 @@ export function useQuizState(isHost: boolean = false) {
   }, []);
 
   const addBuzz = useCallback((ranking: RankingData) => {
+    console.log('🔥 addBuzz called with:', ranking);
     setQuizState(prev => {
       const newRankings = [...prev.rankings, ranking];
       const newBuzzOrder = [...prev.buzzOrder];
@@ -116,12 +238,26 @@ export function useQuizState(isHost: boolean = false) {
         newBuzzOrder.push(ranking.teamName);
       }
       
-      return {
+      console.log('🔥 New rankings:', newRankings, 'BuzzOrder:', newBuzzOrder);
+      
+      const newState = {
         ...prev,
         rankings: newRankings.slice(0, 3), // Keep only top 3
         buzzOrder: newBuzzOrder,
         canBuzz: prev.isHost ? prev.canBuzz : newRankings.length < 3,
       };
+      
+      // Save immediately after buzz rankings change
+      setTimeout(() => {
+        if (savedSessionIdForPersistence) {
+          console.log('💾 Auto-saving after buzz rankings updated, sessionId:', savedSessionIdForPersistence);
+          saveQuizState(newState, savedSessionIdForPersistence);
+        } else {
+          console.warn('❌ Cannot save buzz rankings - no session ID set');
+        }
+      }, 0);
+      
+      return newState;
     });
   }, []);
 
@@ -135,15 +271,26 @@ export function useQuizState(isHost: boolean = false) {
   }, []);
 
   const updateScore = useCallback((teamName: string, points: number = 1) => {
+    console.log('🏆 Updating score for:', teamName, 'points:', points);
     setQuizState(prev => {
       const newScores = new Map(prev.scores);
       const currentScore = newScores.get(teamName) || 0;
       newScores.set(teamName, currentScore + points);
       
-      return {
+      const newState = {
         ...prev,
         scores: newScores,
       };
+      
+      // Save immediately after score change
+      setTimeout(() => {
+        if (savedSessionIdForPersistence) {
+          console.log('💾 Auto-saving after score updated');
+          saveQuizState(newState, savedSessionIdForPersistence);
+        }
+      }, 0);
+      
+      return newState;
     });
   }, []);
 
@@ -179,6 +326,45 @@ export function useQuizState(isHost: boolean = false) {
     }));
   }, []);
 
+  const clearSavedState = useCallback(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('buzzer_quiz_state');
+    }
+  }, []);
+
+  // Use module-level variable to track sessionId
+  
+  const saveCurrentSession = useCallback((sessionId: string) => {
+    console.log('💾 saveCurrentSession called with sessionId:', sessionId, 'isHost:', isHost);
+    if (isHost && sessionId && sessionId !== 'undefined') {
+      savedSessionIdForPersistence = sessionId; // Store for future saves
+      console.log('💾 Saving quiz state to localStorage with session:', sessionId);
+      saveQuizState(quizState, sessionId);
+      
+      // Verify the save worked
+      try {
+        const saved = localStorage.getItem('buzzer_quiz_state');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          console.log('✅ Successfully saved session ID to localStorage:', parsed.sessionId);
+        } else {
+          console.error('❌ Failed to save to localStorage - no data found');
+        }
+      } catch (e) {
+        console.error('❌ Error verifying localStorage save:', e);
+      }
+    }
+  }, [isHost, quizState]);
+  
+  // Simple function to save state when we have a session ID
+  const saveStateIfSessionExists = useCallback((stateToSave?: QuizState) => {
+    const state = stateToSave || quizState;
+    if (isHost && savedSessionIdForPersistence) {
+      console.log('💾 Saving state with sessionId:', savedSessionIdForPersistence);
+      saveQuizState(state, savedSessionIdForPersistence);
+    }
+  }, [isHost, quizState]);
+
   return {
     quizState,
     updateCurrentQuestion,
@@ -189,5 +375,8 @@ export function useQuizState(isHost: boolean = false) {
     updateScore,
     changeQuestion,
     setSinglePlayerBuzzState,
+    clearSavedState,
+    saveCurrentSession,
+    savedSessionId,
   };
 }

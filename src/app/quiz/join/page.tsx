@@ -45,10 +45,16 @@ export default function JoinPage() {
   const [announcements, setAnnouncements] = useState<Array<{ message: string; timestamp: number }>>([]);
   
   const { success, error, connectionChange } = useHapticFeedback();
+  
+  // Debug canBuzz state changes
+  useEffect(() => {
+    console.log('🎯 CanBuzz state changed:', quizState.canBuzz);
+  }, [quizState.canBuzz]);
 
   useEffect(() => {
     setIsMounted(true);
   }, []);
+
 
   useEffect(() => {
     if (!socket) return;
@@ -189,11 +195,9 @@ export default function JoinPage() {
     });
 
 
-    // Request current question on connection
-    if (isRegistered && teamName) {
-      socket.emit('register-team', { teamName });
-      socket.emit('request-question-number');
-    }
+    // Request current question on connection (only for legacy mode)
+    // NOTE: This is now handled in handleRegisterTeam when session join succeeds
+    // No automatic registration should happen in useEffect to avoid double-registration
 
     return () => {
       socket.off('quiz-mode-set');
@@ -222,18 +226,61 @@ export default function JoinPage() {
     if (socket) {
       setTeamName(name);
       setIsRegistered(true);
-      socket.emit('register-team', { teamName: name });
-      socket.emit('request-question-number');
+      
+      // Check if we have a specific session ID to join
+      const urlParams = new URLSearchParams(window.location.search);
+      const sessionId = urlParams.get('session');
+      
+      if (sessionId) {
+        console.log('🎯 Joining specific session:', sessionId);
+        // Use new session-specific joining
+        socket.emit('join-quiz-session', { sessionId, teamName: name });
+        
+        // Listen for session join confirmation
+        socket.on('session-joined-successfully', (data) => {
+          console.log('✅ Successfully joined session:', data);
+          socket.emit('request-question-number');
+        });
+        
+        socket.on('session-join-failed', (data) => {
+          console.error('❌ Failed to join session:', data);
+          alert(`Failed to join quiz: ${data.error}`);
+          setIsRegistered(false);
+          setTeamName('');
+        });
+      } else {
+        console.log('🔄 Using legacy join method');
+        // Fall back to legacy method
+        socket.emit('register-team', { teamName: name });
+        socket.emit('request-question-number');
+      }
+      
       success();
     }
   };
 
   const handleBuzz = () => {
-    if (socket && quizState.canBuzz && teamName) {
+    console.log('🔥 Buzz button clicked! Socket:', !!socket, 'Connected:', socket?.connected, 'CanBuzz:', quizState.canBuzz, 'TeamName:', teamName);
+    
+    if (socket && socket.connected && quizState.canBuzz && teamName) {
+      console.log('📤 Sending buzz event...');
       socket.emit('buzz', {
         teamName,
         timestamp: Date.now()
       });
+      
+      // Provide immediate feedback even if server response is delayed
+      success();
+      setSinglePlayerBuzzState(false);
+      setIsCelebrating(true);
+      setTimeout(() => setIsCelebrating(false), 1000);
+      
+    } else {
+      console.log('❌ Buzz blocked - Socket:', !!socket, 'Connected:', socket?.connected, 'CanBuzz:', quizState.canBuzz, 'TeamName:', teamName);
+      if (!socket?.connected) {
+        console.log('⚠️ Socket not connected, attempting to reconnect...');
+        error(); // Provide haptic feedback for connection issues
+      }
     }
   };
 
@@ -328,13 +375,33 @@ export default function JoinPage() {
             /* Mode-specific interfaces */
             <>
               {quizMode === 'buzzer' && (
-                <QuestionDisplay
-                  questionNumber={quizState.currentQuestion}
-                  question={quizState.currentQuestionData}
-                  isHost={false}
-                  revealedAnswer={revealedAnswer}
-                  className="bg-white/10 dark:bg-dark-800/50 backdrop-blur border-white/20 dark:border-dark-600"
-                />
+                <>
+                  {quizState.currentQuestionData ? (
+                    <QuestionDisplay
+                      questionNumber={quizState.currentQuestion}
+                      question={quizState.currentQuestionData}
+                      isHost={false}
+                      revealedAnswer={revealedAnswer}
+                      className="bg-white/10 dark:bg-dark-800/50 backdrop-blur border-white/20 dark:border-dark-600"
+                    />
+                  ) : (
+                    <Card className="bg-white/10 dark:bg-dark-800/50 backdrop-blur border-white/20 dark:border-dark-600">
+                      <CardContent className="p-8 text-center">
+                        <div className="space-y-4">
+                          <div className="text-lg font-medium text-gray-900 dark:text-gray-100">
+                            Ready to Play! 🎯
+                          </div>
+                          <div className="text-gray-600 dark:text-gray-400">
+                            Waiting for the host to start the first question...
+                          </div>
+                          <div className="text-sm text-gray-500 dark:text-gray-500">
+                            Get ready to buzz in when you know the answer!
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+                </>
               )}
               
               {quizMode === 'basic' && (
@@ -368,7 +435,7 @@ export default function JoinPage() {
                     console.log('Scheduled quiz submitted:', answers);
                     setIsQuizSubmitted(true);
                     if (socket) {
-                      socket.emit('submit-scheduled-quiz', {
+                      socket.emit('submit-answers', {
                         participantName: teamName,
                         answers: answers
                       });

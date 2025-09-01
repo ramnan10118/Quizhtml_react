@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { Header } from '@/components/layout/Header'
 import { Card, CardContent, CardHeader, CardTitle, Button, Input } from '@/components/ui'
 import { QuizQuestion } from '@/types/quiz';
-import { quizDrafts } from '@/lib/drafts';
+import { quizDrafts, liveQuizzes } from '@/lib/drafts';
 import { useAuth } from '@/contexts/AuthContext';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 
@@ -14,12 +14,17 @@ function QuizSetupContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user } = useAuth();
+  
   const [questions, setQuestions] = useState<QuizQuestion[]>([]);
   const [currentDraft, setCurrentDraft] = useState<string | null>(null);
   const [loadingDraft, setLoadingDraft] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
   const [activeTab, setActiveTab] = useState<'manual' | 'ai'>('ai');
   const [errorMessage, setErrorMessage] = useState<string>('');
+  
+  // Quiz mode state
+  const [selectedMode, setSelectedMode] = useState<'buzzer' | 'basic' | 'scheduled'>('buzzer');
+  const [modeSettings, setModeSettings] = useState<any>(null);
   
   // Save draft modal state
   const [showSaveModal, setShowSaveModal] = useState(false);
@@ -54,13 +59,45 @@ function QuizSetupContent() {
     'Movies & Entertainment', 'Sports', 'Art & Culture', 'Music', 'General Knowledge'
   ];
 
-  // Load questions from draft or start fresh
+  // Load questions from sessionStorage, draft, or start fresh
   useEffect(() => {
     const loadData = async () => {
       const draftId = searchParams.get('draft');
       
+      // Load selected mode and settings from sessionStorage
+      try {
+        const savedMode = sessionStorage.getItem('selectedQuizMode');
+        const savedSettings = sessionStorage.getItem('selectedQuizSettings');
+        
+        if (savedMode) {
+          setSelectedMode(savedMode as 'buzzer' | 'basic' | 'scheduled');
+        }
+        
+        if (savedSettings) {
+          setModeSettings(JSON.parse(savedSettings));
+        }
+      } catch (error) {
+        console.error('Error loading mode from sessionStorage:', error);
+      }
+      
+      // First try to load from sessionStorage (for refresh persistence)
+      try {
+        const savedQuestions = sessionStorage.getItem('currentQuestions');
+        if (savedQuestions) {
+          const parsed = JSON.parse(savedQuestions);
+          if (parsed && parsed.length > 0) {
+            console.log('📚 Loading saved questions:', parsed.length);
+            setQuestions(parsed);
+            setIsLoaded(true);
+            return;
+          }
+        }
+      } catch (error) {
+        console.error('Error loading from sessionStorage:', error);
+      }
+      
       if (draftId && user) {
-        // Load from draft
+        // Load from draft if no saved questions
         setLoadingDraft(true);
         try {
           const draft = await quizDrafts.getById(draftId);
@@ -79,8 +116,6 @@ function QuizSetupContent() {
       } else {
         // Start with empty questions for new quiz
         setQuestions([]);
-        // Clear localStorage to prevent old questions from persisting
-        localStorage.removeItem('quiz-setup-questions');
       }
       
       setIsLoaded(true);
@@ -89,10 +124,14 @@ function QuizSetupContent() {
     loadData();
   }, [searchParams, user]);
 
-  // Save questions to localStorage whenever questions change
+  // Save questions to sessionStorage whenever they change
   useEffect(() => {
-    if (isLoaded) {
-      localStorage.setItem('quiz-setup-questions', JSON.stringify(questions));
+    if (isLoaded && questions.length > 0) {
+      try {
+        sessionStorage.setItem('currentQuestions', JSON.stringify(questions));
+      } catch (error) {
+        console.error('Error saving to sessionStorage:', error);
+      }
     }
   }, [questions, isLoaded]);
 
@@ -220,7 +259,6 @@ function QuizSetupContent() {
       setQuestions([]);
       setEditingIndex(null);
       setReorderingIndex(null);
-      localStorage.removeItem('quiz-setup-questions');
     }
   };
 
@@ -253,26 +291,46 @@ function QuizSetupContent() {
     }
   };
 
-  const handleLaunchQuiz = () => {
-    sessionStorage.setItem('customQuestions', JSON.stringify(questions));
-    
-    // Ensure mode and settings are preserved if they were set during mode selection
-    const existingMode = sessionStorage.getItem('selectedQuizMode');
-    const existingSettings = sessionStorage.getItem('selectedQuizSettings');
-    
-    if (!existingMode) {
-      // Default to buzzer mode if no mode was selected
-      sessionStorage.setItem('selectedQuizMode', 'buzzer');
-      sessionStorage.setItem('selectedQuizSettings', JSON.stringify({
-        mode: 'buzzer',
-        timeLimit: undefined,
-        allowRetakes: false,
-        showCorrectAnswers: true,
-        passingScore: undefined
-      }));
+  const handleLaunchQuiz = async () => {
+    if (questions.length === 0) {
+      setErrorMessage('Please add some questions before launching the quiz.');
+      return;
     }
-    
-    router.push('/quiz/host');
+
+    setErrorMessage('');
+
+    try {
+      if (selectedMode === 'scheduled') {
+        // Scheduled mode: Create live quiz in database
+        const liveQuiz = await liveQuizzes.launch({
+          title: currentDraft ? 'Live Quiz' : 'Custom Live Quiz',
+          questions: questions,
+          settings: modeSettings || {
+            timeLimit: undefined,
+            allowRetakes: false,
+            showCorrectAnswers: true,
+            passingScore: undefined
+          }
+        });
+
+        // Navigate to host page with live quiz ID
+        router.push(`/quiz/host?live=${liveQuiz.id}`);
+      } else {
+        // Buzzer and Basic modes: Use sessionStorage
+        sessionStorage.setItem('customQuestions', JSON.stringify(questions));
+        sessionStorage.setItem('selectedQuizMode', selectedMode);
+        sessionStorage.setItem('selectedQuizSettings', JSON.stringify(modeSettings || {
+          mode: selectedMode,
+          showCorrectAnswers: true
+        }));
+
+        // Navigate to host page
+        router.push('/quiz/host');
+      }
+    } catch (error) {
+      setErrorMessage(`Failed to launch ${selectedMode} quiz. Please try again.`);
+      console.error(`Launch ${selectedMode} quiz error:`, error);
+    }
   };
 
   const handleSaveDraft = async () => {
@@ -322,7 +380,7 @@ function QuizSetupContent() {
     <ProtectedRoute>
       <div className="min-h-screen bg-gray-50 dark:bg-dark-900 dark">
       <Header 
-        title={currentDraft ? "Edit Quiz Draft" : "Create Quiz"} 
+        title={currentDraft ? "Edit Quiz Draft" : `Create ${selectedMode.charAt(0).toUpperCase() + selectedMode.slice(1)} Quiz`} 
         subtitle={`${questions.length} question${questions.length !== 1 ? 's' : ''} ready`}
       />
       
@@ -340,7 +398,7 @@ function QuizSetupContent() {
                 </p>
               </div>
               <div className="flex flex-col items-end space-y-2">
-                <div className="flex space-x-3">
+                <div className="flex flex-wrap gap-2 justify-end">
                   {user && (
                     <Button 
                       onClick={handleOpenSaveModal}

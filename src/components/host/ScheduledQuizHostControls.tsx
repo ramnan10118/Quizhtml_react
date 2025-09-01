@@ -2,7 +2,7 @@ import * as React from 'react'
 import { Card, CardContent, CardHeader, CardTitle, Button, Badge, Alert, AlertDescription, cn } from '@/components/ui'
 import { ParticipantSubmission, RevealState, LeaderboardEntry, QuizQuestion } from '@/types/quiz'
 
-const { useState } = React
+const { useState, useEffect } = React
 
 interface ScheduledQuizHostControlsProps {
   submissions: ParticipantSubmission[]
@@ -39,6 +39,18 @@ export function ScheduledQuizHostControls({
   const submittedCount = submissions.filter(s => s.isComplete).length
   const revealedCount = revealedQuestions.filter(r => r.isRevealed).length
   const totalQuestions = questions.length
+
+  // Debug logging
+  console.log('🔍 ScheduledQuizHostControls - submissions:', submissions.length, 'total, ', submittedCount, 'complete');
+  console.log('🔍 ScheduledQuizHostControls - submissions data:', submissions);
+
+  // Show completion message when all questions are revealed (no auto-redirect)
+  useEffect(() => {
+    if (revealedCount > 0 && revealedCount === totalQuestions) {
+      console.log('🎯 All questions revealed - quiz completed!');
+      // Quiz will automatically move to history section when status changes to 'completed'
+    }
+  }, [revealedCount, totalQuestions]);
 
   const handleBatchReveal = () => {
     const nextUnrevealed = revealedQuestions

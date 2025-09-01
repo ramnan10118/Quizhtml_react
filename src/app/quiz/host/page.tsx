@@ -1,9 +1,8 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Header } from '@/components/layout/Header';
-import { ConnectionStatus } from '@/components/layout/ConnectionStatus';
 import { QuestionDisplay } from '@/components/quiz/QuestionDisplay';
 import { ScoreBoard } from '@/components/quiz/ScoreBoard';
 import { ParticipantList } from '@/components/quiz/ParticipantList';
@@ -12,11 +11,15 @@ import { Button } from '@/components/ui/Button';
 import { ModeAwareHostDashboard } from '@/components/host/ModeAwareHostDashboard';
 import { useSocket } from '@/hooks/useSocket';
 import { useQuizState } from '@/hooks/useQuizState';
-import { QuizMode, QuizSettings, QUIZ_QUESTIONS, ParticipantSubmission, RevealState, LeaderboardEntry, QuizQuestion } from '@/types/quiz';
+import { QuizMode, QuizSettings, ParticipantSubmission, RevealState, LeaderboardEntry, QuizQuestion } from '@/types/quiz';
+import { liveQuizzes, LiveQuiz } from '@/lib/drafts';
 
 export default function HostPage() {
   const router = useRouter();
-  const { socket, connectionStatus } = useSocket();
+  const searchParams = useSearchParams();
+  const { socket } = useSocket();
+  
+  // Debug session ID changes - moved after currentSessionId declaration
   const {
     quizState,
     addTeam,
@@ -25,6 +28,9 @@ export default function HostPage() {
     resetBuzzer,
     updateScore,
     changeQuestion,
+    clearSavedState,
+    saveCurrentSession,
+    savedSessionId,
   } = useQuizState(true);
 
   // Load selected quiz mode and settings from sessionStorage
@@ -36,7 +42,7 @@ export default function HostPage() {
     showCorrectAnswers: true,
     passingScore: undefined
   });
-  const [questions, setQuestions] = useState(QUIZ_QUESTIONS);
+  const [questions, setQuestions] = useState<QuizQuestion[]>([]);
   
   // Buzzer mode specific state
   const [revealedAnswer, setRevealedAnswer] = useState<number | null>(null);
@@ -50,68 +56,270 @@ export default function HostPage() {
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [leaderboardVisible, setLeaderboardVisible] = useState(false);
 
+  // Live quiz state
+  const [currentLiveQuiz, setCurrentLiveQuiz] = useState<LiveQuiz | null>(null);
+  const [loadingLiveQuiz, setLoadingLiveQuiz] = useState(false);
+  
+  // Session state for all quiz types
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+  
+  // Debug session ID changes
+  useEffect(() => {
+    console.log('🆔 CurrentSessionId changed:', currentSessionId);
+    if (currentSessionId) {
+      console.log('🔗 Join URL will be: /quiz/join?session=' + currentSessionId);
+    } else {
+      console.log('🔗 Join URL will be: /quiz/join (no session)');
+    }
+  }, [currentSessionId]);
+  
+  // Create or recover session when socket connects
+  useEffect(() => {
+    console.log('🔍 Session creation useEffect - Socket:', !!socket, 'CurrentSessionId:', currentSessionId, 'SavedSessionId:', savedSessionId, 'CurrentMode:', currentMode);
+    
+    if (socket && !currentSessionId) {
+      console.log('✅ Socket connected and no current session - proceeding with session logic');
+      
+      // Check if this is a live quiz - if so, skip session recovery and use live quiz ID
+      const liveQuizId = searchParams.get('live');
+      if (liveQuizId) {
+        console.log('🎯 Live quiz detected, skipping session recovery. Using live quiz ID:', liveQuizId);
+        createNewSession();
+        return;
+      }
+      
+      // Get fresh saved session data (don't rely on savedSessionId from hook since it might be stale)
+      const freshSavedData = typeof window !== 'undefined' ? (() => {
+        try {
+          const stored = localStorage.getItem('buzzer_quiz_state');
+          console.log('🔍 Raw localStorage data:', stored);
+          if (stored) {
+            const parsed = JSON.parse(stored);
+            console.log('🔍 Parsed localStorage data:', parsed);
+            console.log('🔍 Session ID from storage:', parsed.sessionId);
+            console.log('🔍 Timestamp age:', Date.now() - parsed.timestamp, 'ms');
+            
+            if (Date.now() - parsed.timestamp < 2 * 60 * 60 * 1000) {
+              console.log('✅ Session data is fresh, returning session ID:', parsed.sessionId);
+              return parsed.sessionId;
+            } else {
+              console.log('⏰ Session data is too old, removing');
+              localStorage.removeItem('buzzer_quiz_state');
+            }
+          } else {
+            console.log('📭 No data in localStorage');
+          }
+        } catch (e) {
+          console.error('❌ Error loading saved session:', e);
+          localStorage.removeItem('buzzer_quiz_state');
+        }
+        return null;
+      })() : null;
+      
+      console.log('💾 Fresh saved session ID:', freshSavedData);
+      
+      // Check if we have a saved session to recover
+      if (freshSavedData) {
+        console.log('🔄 Found saved session, attempting recovery:', freshSavedData);
+        
+        let recoveryTimeoutId: NodeJS.Timeout | null = null;
+        
+        const handleSessionRecovered = (data: { sessionId: string }) => {
+          console.log('✅ Session recovered successfully:', data.sessionId);
+          setCurrentSessionId(data.sessionId);
+          // Clear any pending new session creation timeouts
+          if (recoveryTimeoutId) {
+            clearTimeout(recoveryTimeoutId);
+            console.log('🚫 Cleared new session creation timeout - using recovered session');
+          }
+        };
+        
+        const handleSessionNotFound = () => {
+          console.log('❌ Saved session not found, creating new session');
+          clearSavedState(); // Clear invalid saved state
+          // Continue with creating new session
+          createNewSession();
+        };
+        
+        socket.once('session-recovered', handleSessionRecovered);
+        socket.once('session-not-found', handleSessionNotFound);
+        
+        socket.emit('recover-session', { 
+          sessionId: freshSavedData, 
+          userInfo: { isHost: true } 
+        });
+        
+        return; // Exit early, let recovery handle it
+      }
+      
+      // No saved session, create new one
+      createNewSession();
+    } else {
+      if (!socket) console.log('❌ No socket available');
+      if (currentSessionId) {
+        console.log('✅ Session already exists:', currentSessionId);
+        // Set up persistence for existing session
+        saveCurrentSession(currentSessionId);
+      }
+    }
+    
+    function createNewSession() {
+      // Determine session type and mode
+      const liveQuizId = searchParams.get('live');
+      const isLiveQuiz = !!liveQuizId;
+      const sessionMode = isLiveQuiz ? 'scheduled' : currentMode;
+      const sessionId = isLiveQuiz ? liveQuizId : `quiz_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      
+      console.log('🔗 Attempting to create NEW session:', sessionId, 'Live Quiz:', isLiveQuiz, 'Mode:', sessionMode);
+      
+      // For live quizzes, the session ID will be set by handleSessionCreated callback
+      // Don't set it immediately to avoid race conditions
+      
+      // Listen for session creation response
+      const handleSessionCreated = (data: { sessionId: string }) => {
+        console.log('✅ Session created event received:', data.sessionId);
+        console.log('🎯 Setting currentSessionId to:', data.sessionId);
+        setCurrentSessionId(data.sessionId);
+        
+        // Save session ID for recovery
+        saveCurrentSession(data.sessionId);
+        
+        // Send questions and mode to the session
+        if (questions.length > 0) {
+          console.log('📋 Sending questions to session:', questions.length);
+          socket.emit('update-session-questions', { 
+            sessionId: data.sessionId, 
+            questions: questions 
+          });
+        }
+        socket.emit('set-quiz-mode', { 
+          mode: sessionMode, 
+          settings: currentSettings,
+          liveQuizId: isLiveQuiz ? liveQuizId : undefined
+        });
+        
+        socket.off('session-created', handleSessionCreated);
+        console.log('✅ Session creation completed and listener removed');
+      };
+      
+      const handleSessionError = (error: any) => {
+        console.error('❌ Session creation failed:', error);
+      };
+      
+      console.log('📡 Setting up event listeners...');
+      socket.on('session-created', handleSessionCreated);
+      socket.on('session-creation-error', handleSessionError);
+      
+      // Request session creation
+      console.log('📤 Emitting create-session request...');
+      socket.emit('create-session', {
+        type: 'quiz',
+        userInfo: { isHost: true },
+        customSessionId: sessionId,
+        initialMode: sessionMode
+      });
+      console.log('📤 Create-session request sent');
+      
+      // Fallback: If session creation doesn't work within 3 seconds, create a client-side session ID
+      const timeoutId = setTimeout(() => {
+        console.log('⏰ Session creation timeout - creating fallback session ID');
+        setCurrentSessionId(sessionId);
+        saveCurrentSession(sessionId);
+      }, 3000);
+    }
+  }, [socket, currentSessionId, currentMode, savedSessionId, clearSavedState, saveCurrentSession]);
+
   // Load mode and settings on component mount
   useEffect(() => {
-    const savedMode = sessionStorage.getItem('selectedQuizMode') as QuizMode;
-    const savedSettings = sessionStorage.getItem('selectedQuizSettings');
-    const customQuestions = sessionStorage.getItem('customQuestions');
-    
-    if (savedMode) {
-      setCurrentMode(savedMode);
-    }
-    
-    if (savedSettings) {
-      try {
-        setCurrentSettings(JSON.parse(savedSettings));
-      } catch (e) {
-        console.error('Error parsing quiz settings:', e);
-      }
-    }
-    
-    if (customQuestions) {
-      try {
-        const parsedQuestions = JSON.parse(customQuestions);
-        setQuestions(parsedQuestions);
-        // Initialize revealed questions state for scheduled mode
-        if (savedMode === 'scheduled') {
-          setRevealedQuestions(parsedQuestions.map((_: QuizQuestion, index: number) => ({
-            questionIndex: index,
-            isRevealed: false,
-            revealedAt: undefined
-          })));
+    const loadQuizData = async () => {
+      const liveQuizId = searchParams.get('live');
+      
+      if (liveQuizId) {
+        // Load live quiz data
+        setLoadingLiveQuiz(true);
+        try {
+          const liveQuiz = await liveQuizzes.getById(liveQuizId);
+          if (liveQuiz) {
+            console.log('📝 Loading live quiz:', liveQuiz);
+            setCurrentLiveQuiz(liveQuiz);
+            setCurrentMode('scheduled'); // Live quizzes use scheduled mode
+            setCurrentSettings(liveQuiz.content.settings);
+            setQuestions(liveQuiz.content.questions);
+            setRevealedQuestions(liveQuiz.content.revealedQuestions);
+            setScheduledSubmissions(liveQuiz.content.submissions || []);
+            setLeaderboard(liveQuiz.content.leaderboard || []);
+            setLeaderboardVisible(liveQuiz.content.leaderboardVisible);
+          } else {
+            console.error('Live quiz not found');
+            router.push('/dashboard');
+          }
+        } catch (error) {
+          console.error('Failed to load live quiz:', error);
+          router.push('/dashboard');
+        } finally {
+          setLoadingLiveQuiz(false);
         }
-      } catch (e) {
-        console.error('Error parsing custom questions:', e);
+      } else {
+        // Load from sessionStorage (regular quiz)
+        const savedMode = sessionStorage.getItem('selectedQuizMode') as QuizMode;
+        const savedSettings = sessionStorage.getItem('selectedQuizSettings');
+        const customQuestions = sessionStorage.getItem('customQuestions');
+        
+        if (savedMode) {
+          setCurrentMode(savedMode);
+        }
+        
+        if (savedSettings) {
+          try {
+            setCurrentSettings(JSON.parse(savedSettings));
+          } catch (e) {
+            console.error('Error parsing quiz settings:', e);
+          }
+        }
+        
+        if (customQuestions) {
+          try {
+            const parsedQuestions = JSON.parse(customQuestions);
+            setQuestions(parsedQuestions);
+            // Initialize revealed questions state for scheduled mode
+            if (savedMode === 'scheduled') {
+              setRevealedQuestions(parsedQuestions.map((_: QuizQuestion, index: number) => ({
+                questionIndex: index,
+                isRevealed: false,
+                revealedAt: undefined
+              })));
+            }
+          } catch (e) {
+            console.error('Error parsing custom questions:', e);
+          }
+        } else if (savedMode === 'scheduled') {
+          // Initialize with empty revealed questions - questions will be loaded later
+          setRevealedQuestions([]); // Will be set when questions are loaded
+        }
       }
-    } else if (savedMode === 'scheduled') {
-      // Initialize with default questions if no custom questions
-      setRevealedQuestions(QUIZ_QUESTIONS.map((_: QuizQuestion, index: number) => ({
-        questionIndex: index,
-        isRevealed: false,
-        revealedAt: undefined
-      })));
+    };
+    
+    loadQuizData();
+  }, [searchParams, router]);
+
+  // Send questions to session when they become available
+  useEffect(() => {
+    if (socket && currentSessionId && questions.length > 0) {
+      console.log('📋 Sending questions to existing session:', currentSessionId, questions.length);
+      socket.emit('update-session-questions', {
+        sessionId: currentSessionId,
+        questions: questions
+      });
     }
-  }, []);
+  }, [socket, currentSessionId, questions]);
+
+  // Removed duplicate session creation logic - using simplified version above
 
   useEffect(() => {
     if (!socket) return;
 
-    // Send custom questions and quiz mode to server on connection
-    const customQuestions = sessionStorage.getItem('customQuestions');
-    if (customQuestions) {
-      try {
-        const questions = JSON.parse(customQuestions);
-        socket.emit('set-custom-questions', { questions });
-      } catch (e) {
-        console.error('Error parsing custom questions:', e);
-      }
-    }
-
-    // Send quiz mode and settings to server
-    socket.emit('set-quiz-mode', { 
-      mode: currentMode, 
-      settings: currentSettings
-    });
+    // Note: Questions and mode are now sent via separate useEffect above
+    // This ensures live quiz questions from database are used, not sessionStorage
 
     // Socket event listeners
     socket.on('register-team', (data) => {
@@ -123,6 +331,7 @@ export default function HostPage() {
     });
 
     socket.on('buzz', (data) => {
+      console.log('🔥 Host received buzz event:', data);
       addBuzz({
         teamName: data.teamName,
         timestamp: data.timestamp,
@@ -142,15 +351,43 @@ export default function HostPage() {
     });
 
     // Scheduled mode events
-    socket.on('submission-stored', (data: { participantName: string }) => {
-      console.log('Scheduled submission stored:', data);
-      // For scheduled mode, we'll get full data when questions are revealed
+    socket.on('submission-stored', async (data: { participantName: string }) => {
+      console.log('📝 Scheduled submission stored:', data);
+      console.log('📝 Is live quiz?', !!currentLiveQuiz);
+      console.log('📝 Current mode:', currentMode);
+      
+      // For live quizzes, refresh the data to get updated submissions
+      if (currentLiveQuiz) {
+        console.log('📝 Requesting fresh submissions for live quiz');
+        try {
+          // Request fresh data from server
+          socket.emit('get-all-submissions');
+        } catch (error) {
+          console.error('Failed to refresh live quiz data:', error);
+        }
+      }
     });
 
-    socket.on('all-submissions', (data: { submissions: ParticipantSubmission[]; revealedQuestions: RevealState[] }) => {
+    socket.on('all-submissions', async (data: { submissions: ParticipantSubmission[]; revealedQuestions: RevealState[] }) => {
       console.log('All scheduled submissions received:', data);
+      console.log('📊 Submissions count:', data.submissions?.length || 0);
+      console.log('📊 Submissions data:', data.submissions);
       setScheduledSubmissions(data.submissions);
       setRevealedQuestions(data.revealedQuestions);
+      
+      // Save to database if this is a live quiz
+      if (currentLiveQuiz) {
+        try {
+          const updatedContent = {
+            ...currentLiveQuiz.content,
+            submissions: data.submissions,
+            revealedQuestions: data.revealedQuestions
+          };
+          await liveQuizzes.updateContent(currentLiveQuiz.id, updatedContent);
+        } catch (error) {
+          console.error('Failed to save submissions to live quiz:', error);
+        }
+      }
     });
 
     socket.on('results-summary', (data: { submissions: ParticipantSubmission[] }) => {
@@ -177,10 +414,24 @@ export default function HostPage() {
       setLeaderboard(data.leaderboard);
     });
 
-    socket.on('leaderboard-updated', (data: { leaderboard: Array<{ rank: number; participantName: string; score: number; submissionTime: number; questionsRevealed: number }>; visible: boolean }) => {
+    socket.on('leaderboard-updated', async (data: { leaderboard: Array<{ rank: number; participantName: string; score: number; submissionTime: number; questionsRevealed: number }>; visible: boolean }) => {
       console.log('Leaderboard updated:', data);
       setLeaderboard(data.leaderboard || []);
       setLeaderboardVisible(data.visible || false);
+      
+      // Save to database if this is a live quiz
+      if (currentLiveQuiz) {
+        try {
+          const updatedContent = {
+            ...currentLiveQuiz.content,
+            leaderboard: data.leaderboard || [],
+            leaderboardVisible: data.visible || false
+          };
+          await liveQuizzes.updateContent(currentLiveQuiz.id, updatedContent);
+        } catch (error) {
+          console.error('Failed to save leaderboard to live quiz:', error);
+        }
+      }
     });
 
     return () => {
@@ -290,6 +541,8 @@ export default function HostPage() {
       }
       // Clear custom questions from storage
       sessionStorage.removeItem('customQuestions');
+      // Clear saved quiz state
+      clearSavedState();
       // Redirect to mode selection
       router.push('/mode');
     }
@@ -300,15 +553,51 @@ export default function HostPage() {
     setCurrentSettings(prev => ({ ...prev, ...settings }));
   };
 
-  const handleRevealQuestion = (questionIndex: number) => {
+  const handleRevealQuestion = async (questionIndex: number) => {
     console.log('Revealing question:', questionIndex);
+    
+    // Update local state
+    const newRevealedQuestions = revealedQuestions.map((q, index) => 
+      index === questionIndex 
+        ? { ...q, isRevealed: true, revealedAt: Date.now() }
+        : q
+    );
+    setRevealedQuestions(newRevealedQuestions);
+    
+    // Update live quiz database if this is a live quiz
+    if (currentLiveQuiz) {
+      try {
+        await liveQuizzes.updateRevealedQuestions(currentLiveQuiz.id, newRevealedQuestions);
+      } catch (error) {
+        console.error('Failed to update live quiz:', error);
+      }
+    }
+    
     if (socket) {
       socket.emit('reveal-question', { questionIndex });
     }
   };
 
-  const handleRevealAll = () => {
+  const handleRevealAll = async () => {
     console.log('Revealing all questions');
+    
+    // Update local state
+    const newRevealedQuestions = revealedQuestions.map(q => ({ 
+      ...q, 
+      isRevealed: true, 
+      revealedAt: Date.now() 
+    }));
+    setRevealedQuestions(newRevealedQuestions);
+    
+    // Update live quiz database if this is a live quiz
+    if (currentLiveQuiz) {
+      try {
+        await liveQuizzes.updateRevealedQuestions(currentLiveQuiz.id, newRevealedQuestions);
+      } catch (error) {
+        console.error('Failed to update live quiz:', error);
+      }
+    }
+    
     if (socket) {
       socket.emit('reveal-all');
     }
@@ -341,6 +630,7 @@ export default function HostPage() {
     }
   };
 
+
   // Calculate participant and submission counts
   const participantCount = currentMode === 'buzzer' ? quizState.teams.size : participants.length;
   const submissionCount = currentMode === 'basic' ? basicSubmissions.length : 
@@ -362,7 +652,6 @@ export default function HostPage() {
         }
       >
         <div className="flex items-center space-x-4">
-          <ConnectionStatus status={connectionStatus} />
           <Button
             onClick={handleExitQuiz}
             variant="destructive"
@@ -375,7 +664,14 @@ export default function HostPage() {
 
       <main className="flex-1 p-6 bg-gray-50 dark:bg-dark-900">
         <div className="max-w-7xl mx-auto">
-          {currentMode === 'buzzer' ? (
+          {loadingLiveQuiz ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="text-center">
+                <div className="animate-spin text-4xl mb-4">🔄</div>
+                <p className="text-gray-600 dark:text-gray-400">Loading live quiz...</p>
+              </div>
+            </div>
+          ) : currentMode === 'buzzer' ? (
             // Original buzzer interface for backward compatibility
             <div className="grid lg:grid-cols-3 gap-6">
               <div className="lg:col-span-2">
@@ -398,7 +694,7 @@ export default function HostPage() {
                   onResetBuzzer={handleResetBuzzer}
                 />
                 <SharePanel
-                  joinPath="/quiz/join"
+                  joinPath={currentSessionId ? `/quiz/join?session=${currentSessionId}` : (searchParams.get('live') ? `/quiz/join?session=${searchParams.get('live')}` : "/quiz/join")}
                   title="Invite Players"
                   description="Share with participants to join the quiz"
                 />
@@ -419,6 +715,8 @@ export default function HostPage() {
               scores={teamScores}
               participantCount={participantCount}
               submissionCount={submissionCount}
+              currentSessionId={currentSessionId}
+              searchParams={searchParams}
               onSettingsUpdate={handleSettingsUpdate}
               onRevealQuestion={handleRevealQuestion}
               onRevealAll={handleRevealAll}

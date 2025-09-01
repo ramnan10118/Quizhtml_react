@@ -107,8 +107,48 @@ export interface QuizState {
   scheduledState?: ScheduledQuizState;
 }
 
+// Session recovery data types
+export interface SessionData {
+  sessionId: string;
+  type: 'quiz' | 'poll';
+  currentQuestion: number;
+  totalQuestions: number;
+  currentQuestionData: QuizQuestion | null;
+  teams: [string, string][]; // [socketId, teamName] pairs
+  scores: [string, number][]; // [teamName, score] pairs
+  buzzOrder: string[];
+  canBuzz: boolean;
+  quizMode: QuizMode;
+  settings: QuizSettings;
+  currentPoll: object | null;
+  pollHistory: object[];
+  teamName?: string;
+  userInfo?: Record<string, unknown>;
+}
+
+export interface SessionRecoveryRequest {
+  sessionId: string;
+  userInfo?: {
+    teamName?: string;
+    isHost?: boolean;
+    [key: string]: unknown;
+  };
+}
+
 // Socket.io event types
 export interface ServerToClientEvents {
+  // Session recovery events
+  'session-created': (data: { sessionId: string; sessionData: SessionData }) => void;
+  'session-joined': (data: { sessionId: string; sessionData: SessionData }) => void;
+  'session-recovered': (data: { sessionId: string; sessionData: SessionData }) => void;
+  'session-not-found': (data: { sessionId: string }) => void;
+  'participant-joined': (data: { socketId: string; teamName: string }) => void;
+  'participant-disconnected': (data: { socketId: string; teamName: string }) => void;
+  
+  // Session-based question management events
+  'session-questions-updated': (data: { questions: QuizQuestion[]; currentQuestion: number; currentQuestionData: QuizQuestion | null }) => void;
+  'session-questions-retrieved': (data: { sessionId: string; questions: QuizQuestion[]; currentQuestion: number }) => void;
+  
   // Existing buzzer mode events
   'question-change': (data: QuestionChangeData) => void;
   'buzz': (data: BuzzData) => void;
@@ -145,6 +185,15 @@ export interface ServerToClientEvents {
 }
 
 export interface ClientToServerEvents {
+  // Session recovery events
+  'create-session': (data: { type?: 'quiz' | 'poll'; userInfo?: Record<string, unknown> }) => void;
+  'join-session': (data: { sessionId: string; teamName: string }) => void;
+  'recover-session': (data: SessionRecoveryRequest) => void;
+  
+  // Session-based question management events
+  'update-session-questions': (data: { sessionId: string; questions: QuizQuestion[] }) => void;
+  'get-session-questions': (data: { sessionId: string }) => void;
+  
   // Existing buzzer mode events
   'question-change': (data: { questionNumber: number }) => void;
   'buzz': (data: { teamName: string; timestamp: number }) => void;
@@ -186,136 +235,4 @@ export interface SocketData {
   teamName?: string;
 }
 
-// Quiz questions data
-export const QUIZ_QUESTIONS: QuizQuestion[] = [
-  {
-    text: "Who has more Instagram followers?",
-    options: [
-      "Kylie Jenner",
-      "Lionel Messi", 
-      "Cristiano Ronaldo",
-      "Kim Kardashian"
-    ],
-    correct: 2
-  },
-  {
-    text: "Which movie made more money in 2023?",
-    options: [
-      "Barbie",
-      "Oppenheimer",
-      "Mario Movie",
-      "Avatar 2"
-    ],
-    correct: 0
-  },
-  {
-    text: "What's Taylor Swift's cat's name?",
-    options: [
-      "Meredith",
-      "Oliver",
-      "Luna",
-      "Bella"
-    ],
-    correct: 0
-  },
-  {
-    text: "Which Netflix show features Wednesday Addams?",
-    options: [
-      "Stranger Things",
-      "Wednesday",
-      "Shadow and Bone",
-      "Outer Banks"
-    ],
-    correct: 1
-  },
-  {
-    text: "Most played song on Spotify ever is:",
-    options: [
-      "Shape of You",
-      "Blinding Lights",
-      "Dance Monkey",
-      "Someone Like You"
-    ],
-    correct: 0
-  },
-  {
-    text: "What's the most used emoji worldwide?",
-    options: [
-      "😂",
-      "❤️",
-      "👍",
-      "😭"
-    ],
-    correct: 0
-  },
-  {
-    text: "Which platform has more users?",
-    options: [
-      "Instagram",
-      "TikTok",
-      "Twitter",
-      "Snapchat"
-    ],
-    correct: 0
-  },
-  {
-    text: "Who won Best Actor Oscar 2023?",
-    options: [
-      "Austin Butler",
-      "Brendan Fraser",
-      "Colin Farrell",
-      "Tom Cruise"
-    ],
-    correct: 1
-  },
-  {
-    text: "What's BTS's fandom called?",
-    options: [
-      "ARMY",
-      "BLINK",
-      "ONCE",
-      "STAY"
-    ],
-    correct: 0
-  },
-  {
-    text: "Most subscribed YouTube channel is:",
-    options: [
-      "PewDiePie",
-      "MrBeast",
-      "T-Series",
-      "Cocomelon"
-    ],
-    correct: 1
-  },
-  {
-    text: "How many subscribers does ACKO insurance YouTube channel have?",
-    options: [
-      "125K",
-      "250K",
-      "500K",
-      "750K"
-    ],
-    correct: 1
-  },
-  {
-    text: "How many vehicles do we insure today at ACKO?",
-    options: [
-      "2 Million",
-      "3.5 Million",
-      "5 Million",
-      "7 Million"
-    ],
-    correct: 2
-  },
-  {
-    text: "How many health policies have we sold till date at ACKO?",
-    options: [
-      "100K",
-      "250K",
-      "500K",
-      "1 Million"
-    ],
-    correct: 3
-  }
-];
+// Hardcoded questions removed - all questions now come from database or API generation

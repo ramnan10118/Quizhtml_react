@@ -39,7 +39,9 @@ export function useSocket(serverUrl?: string) {
     });
 
     return () => {
-      socketClient.disconnect();
+      // Don't disconnect on cleanup - let the singleton manage its lifecycle
+      // Only disconnect if component is actually unmounting permanently
+      console.log('🧹 useSocket cleanup - keeping socket alive for potential reconnection');
     };
   }, [serverUrl]);
 

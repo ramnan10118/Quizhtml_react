@@ -27,6 +27,7 @@ export default function ModeSelectionPage() {
     }
   };
 
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-dark-900 dark">
       {/* Header */}
@@ -111,11 +112,22 @@ export default function ModeSelectionPage() {
                   </div>
                 </div>
                 {user ? (
-                  <Link href="/quiz" className="block">
-                    <Button className="w-full" size="lg">
-                      Start Quiz
-                    </Button>
-                  </Link>
+                  <Button 
+                    onClick={() => {
+                      alert('Button clicked!');
+                      // Clear questions immediately and navigate
+                      sessionStorage.removeItem('currentQuestions');
+                      console.log('🗑️ Cleared questions from mode page');
+                      // Small delay to ensure clearing takes effect
+                      setTimeout(() => {
+                        router.push('/quiz/setup');
+                      }, 10);
+                    }}
+                    className="w-full" 
+                    size="lg"
+                  >
+                    Start Quiz
+                  </Button>
                 ) : (
                   <div className="space-y-2">
                     <Button disabled className="w-full" size="lg">

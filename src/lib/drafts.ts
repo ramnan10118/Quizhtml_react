@@ -61,6 +61,42 @@ export interface CreateLivePollData {
   options: string[]
 }
 
+export interface LiveQuiz {
+  id: string
+  user_id: string
+  title: string
+  description: string | null
+  type: string
+  status: string
+  content: {
+    questions: QuizQuestion[]
+    mode: 'scheduled'
+    settings: {
+      timeLimit?: number
+      allowRetakes?: boolean
+      showCorrectAnswers?: boolean
+      passingScore?: number
+    }
+    revealedQuestions: { questionIndex: number; isRevealed: boolean; revealedAt?: number }[]
+    submissions: any[]
+    leaderboard: any[]
+    leaderboardVisible: boolean
+  }
+  created_at: string
+  updated_at: string
+}
+
+export interface CreateLiveQuizData {
+  title: string
+  questions: QuizQuestion[]
+  settings: {
+    timeLimit?: number
+    allowRetakes?: boolean
+    showCorrectAnswers?: boolean
+    passingScore?: number
+  }
+}
+
 export const quizDrafts = {
   // Save a new quiz draft
   async save(data: CreateQuizDraftData): Promise<QuizDraft> {
@@ -94,6 +130,7 @@ export const quizDrafts = {
       .select('*')
       .eq('user_id', user.id)
       .eq('type', 'quiz')
+      .eq('status', 'draft')
       .order('created_at', { ascending: false })
 
     if (error) throw error
@@ -328,6 +365,200 @@ export const livePolls = {
       .eq('id', id)
       .eq('user_id', user.id)
       .eq('type', 'poll')
+      .eq('status', 'live')
+
+    if (error) throw error
+  }
+}
+
+export const quizHistory = {
+  // Get all quiz history (drafts + completed quizzes) for the current user
+  async getAll(): Promise<(QuizDraft | LiveQuiz)[]> {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) throw new Error('User not authenticated')
+
+    const { data, error } = await supabase
+      .from('drafts')
+      .select('*')
+      .eq('user_id', user.id)
+      .eq('type', 'quiz')
+      .in('status', ['draft', 'completed'])
+      .order('updated_at', { ascending: false })
+
+    if (error) throw error
+    return (data || []) as (QuizDraft | LiveQuiz)[]
+  },
+
+  // Get a single quiz (draft or completed) by ID
+  async getById(id: string): Promise<QuizDraft | LiveQuiz | null> {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) throw new Error('User not authenticated')
+
+    const { data, error } = await supabase
+      .from('drafts')
+      .select('*')
+      .eq('id', id)
+      .eq('user_id', user.id)
+      .eq('type', 'quiz')
+      .in('status', ['draft', 'completed'])
+      .single()
+
+    if (error) {
+      if (error.code === 'PGRST116') return null // Not found
+      throw error
+    }
+    return data as QuizDraft | LiveQuiz
+  },
+}
+
+export const liveQuizzes = {
+  // Launch a new live quiz
+  async launch(data: CreateLiveQuizData): Promise<LiveQuiz> {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) throw new Error('User not authenticated')
+
+    const quizContent = {
+      questions: data.questions,
+      mode: 'scheduled' as const,
+      settings: data.settings,
+      revealedQuestions: data.questions.map((_, index) => ({
+        questionIndex: index,
+        isRevealed: false,
+        revealedAt: undefined
+      })),
+      submissions: [],
+      leaderboard: [],
+      leaderboardVisible: false
+    }
+
+    const { data: liveQuiz, error } = await supabase
+      .from('drafts')
+      .insert({
+        title: data.title,
+        user_id: user.id,
+        type: 'quiz',
+        status: 'live',
+        content: quizContent,
+      })
+      .select()
+      .single()
+
+    if (error) throw error
+    return liveQuiz as LiveQuiz
+  },
+
+  // Get all live quizzes for the current user
+  async getAll(): Promise<LiveQuiz[]> {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) throw new Error('User not authenticated')
+
+    const { data, error } = await supabase
+      .from('drafts')
+      .select('*')
+      .eq('user_id', user.id)
+      .eq('type', 'quiz')
+      .eq('status', 'live')
+      .order('created_at', { ascending: false })
+
+    if (error) throw error
+    return (data || []) as LiveQuiz[]
+  },
+
+  // Get a single live quiz by ID
+  async getById(id: string): Promise<LiveQuiz | null> {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) throw new Error('User not authenticated')
+
+    const { data, error } = await supabase
+      .from('drafts')
+      .select('*')
+      .eq('id', id)
+      .eq('user_id', user.id)
+      .eq('type', 'quiz')
+      .eq('status', 'live')
+      .single()
+
+    if (error) {
+      if (error.code === 'PGRST116') return null // Not found
+      throw error
+    }
+    return data as LiveQuiz
+  },
+
+  // Update revealed questions and auto-complete if all revealed
+  async updateRevealedQuestions(id: string, revealedQuestions: { questionIndex: number; isRevealed: boolean; revealedAt?: number }[]): Promise<void> {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) throw new Error('User not authenticated')
+
+    // Get current quiz content
+    const currentQuiz = await this.getById(id)
+    if (!currentQuiz) throw new Error('Quiz not found')
+
+    const updatedContent = {
+      ...currentQuiz.content,
+      revealedQuestions
+    }
+
+    // Check if all questions are revealed
+    const allRevealed = revealedQuestions.every(q => q.isRevealed)
+    const newStatus = allRevealed ? 'completed' : 'live'
+
+    const { error } = await supabase
+      .from('drafts')
+      .update({ 
+        content: updatedContent,
+        status: newStatus
+      })
+      .eq('id', id)
+      .eq('user_id', user.id)
+      .eq('type', 'quiz')
+
+    if (error) throw error
+  },
+
+  // Update quiz content (for submissions, leaderboard, etc.)
+  async updateContent(id: string, content: LiveQuiz['content']): Promise<void> {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) throw new Error('User not authenticated')
+
+    const { error } = await supabase
+      .from('drafts')
+      .update({ content })
+      .eq('id', id)
+      .eq('user_id', user.id)
+      .eq('type', 'quiz')
+      .eq('status', 'live')
+
+    if (error) throw error
+  },
+
+  // Force complete a live quiz (in case needed)
+  async complete(id: string): Promise<void> {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) throw new Error('User not authenticated')
+
+    const { error } = await supabase
+      .from('drafts')
+      .update({ status: 'completed' })
+      .eq('id', id)
+      .eq('user_id', user.id)
+      .eq('type', 'quiz')
+      .eq('status', 'live')
+
+    if (error) throw error
+  },
+
+  // Delete a live quiz
+  async delete(id: string): Promise<void> {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) throw new Error('User not authenticated')
+
+    const { error } = await supabase
+      .from('drafts')
+      .delete()
+      .eq('id', id)
+      .eq('user_id', user.id)
+      .eq('type', 'quiz')
       .eq('status', 'live')
 
     if (error) throw error

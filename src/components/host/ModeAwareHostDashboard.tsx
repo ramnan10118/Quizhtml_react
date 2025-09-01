@@ -31,6 +31,8 @@ interface ModeAwareHostDashboardProps {
   // Common
   participantCount: number
   submissionCount: number
+  currentSessionId?: string | null
+  searchParams?: URLSearchParams
   
   // Callbacks
   onSettingsUpdate: (settings: Partial<QuizSettings>) => void
@@ -56,6 +58,8 @@ export function ModeAwareHostDashboard({
   scores = [],
   participantCount,
   submissionCount,
+  currentSessionId,
+  searchParams,
   onSettingsUpdate,
   onRevealQuestion,
   onRevealAll,
@@ -65,6 +69,13 @@ export function ModeAwareHostDashboard({
   className
 }: ModeAwareHostDashboardProps) {
   const [currentTab, setCurrentTab] = useState<HostDashboardTab>('control')
+
+  // Debug logging for session ID
+  React.useEffect(() => {
+    console.log('🔍 ModeAwareHostDashboard - currentSessionId:', currentSessionId);
+    console.log('🔍 ModeAwareHostDashboard - searchParams live:', searchParams?.get('live'));
+    console.log('🔍 ModeAwareHostDashboard - mode:', mode);
+  }, [currentSessionId, searchParams, mode])
 
   // Auto-switch to results when there are submissions/results
   useEffect(() => {
@@ -246,6 +257,18 @@ export function ModeAwareHostDashboard({
   }
 
   const renderSettingsTab = () => {
+    // Generate share URL with debug logging
+    const shareUrl = currentSessionId 
+      ? `${typeof window !== 'undefined' ? window.location.origin : ''}/quiz/join?session=${currentSessionId}`
+      : (searchParams?.get('live') 
+          ? `${typeof window !== 'undefined' ? window.location.origin : ''}/quiz/join?session=${searchParams.get('live')}`
+          : `${typeof window !== 'undefined' ? window.location.origin : ''}/quiz/join`
+        );
+    
+    console.log('🔗 Settings Tab - Generated share URL:', shareUrl);
+    console.log('🔗 Settings Tab - currentSessionId:', currentSessionId);
+    console.log('🔗 Settings Tab - live param:', searchParams?.get('live'));
+
     return (
       <Card>
         <CardHeader>
@@ -361,14 +384,15 @@ export function ModeAwareHostDashboard({
               <div className="flex items-center space-x-2">
                 <input
                   type="text"
-                  value={`${window.location.origin}/quiz/join`}
+                  value={shareUrl}
                   readOnly
                   className="flex-1 px-3 py-2 text-sm border rounded bg-muted"
                 />
                 <Button
                   size="sm"
                   onClick={() => {
-                    navigator.clipboard.writeText(`${window.location.origin}/quiz/join`)
+                    navigator.clipboard.writeText(shareUrl);
+                    console.log('📋 Copied share URL:', shareUrl);
                   }}
                 >
                   Copy

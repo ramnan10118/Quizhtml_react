@@ -226,6 +226,11 @@ export function ScheduledQuizInterface({
           
           <CardContent className="space-y-6">
             {questions.map((question, questionIndex) => {
+              // Safety check for undefined question
+              if (!question) {
+                return null;
+              }
+              
               const revealInfo = revealedQuestions.find(r => r.questionIndex === questionIndex)
               const isRevealed = revealInfo?.isRevealed || false
               const userAnswer = answers.find(a => a.questionIndex === questionIndex)
@@ -329,6 +334,26 @@ export function ScheduledQuizInterface({
 
   // Quiz View
   const currentQuestion = questions[currentQuestionIndex]
+  
+  // Handle case where questions haven't loaded yet or currentQuestion is undefined
+  if (!currentQuestion) {
+    return (
+      <div className={cn('w-full max-w-4xl mx-auto space-y-6', className)}>
+        <Card>
+          <CardContent className="p-8 text-center">
+            <div className="space-y-4">
+              <div className="text-lg font-medium text-foreground">
+                Loading Quiz... 📚
+              </div>
+              <div className="text-muted-foreground">
+                Waiting for questions to load...
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
   
   return (
     <div className={cn('w-full max-w-4xl mx-auto space-y-6', className)}>
