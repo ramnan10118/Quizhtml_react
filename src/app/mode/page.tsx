@@ -34,7 +34,7 @@ export default function ModeSelectionPage() {
       <header className="border-b border-gray-200 dark:border-dark-700 bg-white dark:bg-dark-800">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <Link href="/" className="text-xl font-semibold text-gray-900 dark:text-gray-100 hover:text-gray-700 dark:hover:text-gray-300">
-            Quiz Buzzer
+            Audience Voice
           </Link>
           <div className="flex items-center space-x-4">
 {user ? (
@@ -69,9 +69,9 @@ export default function ModeSelectionPage() {
       </header>
       
       {/* Main Content */}
-      <main className="flex items-center justify-center min-h-[calc(100vh-80px)] px-6">
+      <main className="flex items-center justify-center min-h-[calc(100vh-80px)] px-6 py-16">
         <div className="w-full max-w-4xl">
-          <div className="text-center mb-12">
+          <div className="text-center mb-16">
             <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-4">
               Choose Your Mode
             </h1>
@@ -87,57 +87,30 @@ export default function ModeSelectionPage() {
                 <div className="w-16 h-16 bg-primary-100 dark:bg-primary-900/30 rounded-2xl flex items-center justify-center mx-auto mb-4">
                   <span className="text-2xl">🎯</span>
                 </div>
-                <CardTitle className="text-xl text-gray-900 dark:text-gray-100">Quiz Competition</CardTitle>
+                <CardTitle className="text-xl text-gray-900 dark:text-gray-100">Interactive Quizzes</CardTitle>
               </CardHeader>
               <CardContent className="space-y-6">
-                <p className="text-gray-600 dark:text-gray-400 text-center">
-                  Interactive trivia competition with real-time buzzers and scoring
+                <p className="text-gray-600 dark:text-gray-400 text-left">
+                  Engage your audience with interactive quizzes.
                 </p>
                 <div className="space-y-3">
                   <div className="flex items-center space-x-3">
                     <div className="w-2 h-2 bg-primary-500 dark:bg-primary-400 rounded-full"></div>
-                    <span className="text-sm text-gray-700 dark:text-gray-300">13 engaging trivia questions</span>
+                    <span className="text-sm text-gray-700 dark:text-gray-300">Buzzer mode with real-time competition</span>
                   </div>
                   <div className="flex items-center space-x-3">
                     <div className="w-2 h-2 bg-primary-500 dark:bg-primary-400 rounded-full"></div>
-                    <span className="text-sm text-gray-700 dark:text-gray-300">Lightning-fast buzzer system</span>
+                    <span className="text-sm text-gray-700 dark:text-gray-300">Basic mode for self-paced quizzes</span>
                   </div>
                   <div className="flex items-center space-x-3">
                     <div className="w-2 h-2 bg-primary-500 dark:bg-primary-400 rounded-full"></div>
-                    <span className="text-sm text-gray-700 dark:text-gray-300">Real-time scoring & rankings</span>
+                    <span className="text-sm text-gray-700 dark:text-gray-300">Scheduled mode with controlled reveals</span>
                   </div>
                   <div className="flex items-center space-x-3">
                     <div className="w-2 h-2 bg-primary-500 dark:bg-primary-400 rounded-full"></div>
-                    <span className="text-sm text-gray-700 dark:text-gray-300">Mobile-optimized experience</span>
+                    <span className="text-sm text-gray-700 dark:text-gray-300">AI-generated questions on any topic</span>
                   </div>
                 </div>
-                {user ? (
-                  <Button 
-                    onClick={() => {
-                      alert('Button clicked!');
-                      // Clear questions immediately and navigate
-                      sessionStorage.removeItem('currentQuestions');
-                      console.log('🗑️ Cleared questions from mode page');
-                      // Small delay to ensure clearing takes effect
-                      setTimeout(() => {
-                        router.push('/quiz/setup');
-                      }, 10);
-                    }}
-                    className="w-full" 
-                    size="lg"
-                  >
-                    Start Quiz
-                  </Button>
-                ) : (
-                  <div className="space-y-2">
-                    <Button disabled className="w-full" size="lg">
-                      Start Quiz
-                    </Button>
-                    <p className="text-xs text-center text-gray-500 dark:text-gray-400">
-                      Sign in required to access quiz features
-                    </p>
-                  </div>
-                )}
               </CardContent>
             </Card>
 
@@ -150,8 +123,8 @@ export default function ModeSelectionPage() {
                 <CardTitle className="text-xl text-gray-900 dark:text-gray-100">Live Polling</CardTitle>
               </CardHeader>
               <CardContent className="space-y-6">
-                <p className="text-gray-600 dark:text-gray-400 text-center">
-                  Create instant polls with custom questions and real-time responses
+                <p className="text-gray-600 dark:text-gray-400 text-left">
+                  Capture audience opinions with live polling.
                 </p>
                 <div className="space-y-3">
                   <div className="flex items-center space-x-3">
@@ -171,28 +144,12 @@ export default function ModeSelectionPage() {
                     <span className="text-sm text-gray-700 dark:text-gray-300">Real-time vote tracking</span>
                   </div>
                 </div>
-                {user ? (
-                  <Link href="/polling" className="block">
-                    <Button variant="secondary" className="w-full" size="lg">
-                      Start Polling
-                    </Button>
-                  </Link>
-                ) : (
-                  <div className="space-y-2">
-                    <Button disabled variant="secondary" className="w-full" size="lg">
-                      Start Polling
-                    </Button>
-                    <p className="text-xs text-center text-gray-500 dark:text-gray-400">
-                      Sign in required to access polling features
-                    </p>
-                  </div>
-                )}
               </CardContent>
             </Card>
           </div>
 
           {/* Use Cases */}
-          <div className="mt-16 text-center">
+          <div className="mt-24 text-center">
             <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-8">Perfect for Any Event</h2>
             <div className="grid md:grid-cols-3 gap-6 max-w-2xl mx-auto">
               <div className="space-y-2">
