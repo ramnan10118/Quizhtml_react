@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
+import { ChevronLeft, ChevronRight, Eye, Gamepad2, RotateCcw } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
+import { Progress } from '@/components/ui/Progress';
 import { QuizQuestion } from '@/types/quiz';
 import { cn } from '@/lib/utils';
 
@@ -28,7 +30,7 @@ export function QuizControls({
   const handleRevealAnswer = async () => {
     setIsRevealing(true);
     onRevealAnswer();
-    
+
     // Reset revealing state after animation
     setTimeout(() => {
       setIsRevealing(false);
@@ -39,71 +41,36 @@ export function QuizControls({
   const canGoNext = currentQuestion < totalQuestions;
 
   return (
-    <Card className={cn('w-full bg-gradient-to-br from-slate-50 to-slate-100 dark:from-dark-800 dark:to-dark-700', className)}>
-      <CardHeader>
-        <CardTitle className="text-slate-700 dark:text-gray-100 flex items-center space-x-2">
-          <span>🎮</span>
-          <span>Quiz Controls</span>
+    <Card className={cn('w-full', className)}>
+      <CardHeader className="pb-3">
+        <CardTitle className="flex items-center gap-2">
+          <Gamepad2 className="h-4 w-4 text-primary" /> Quiz controls
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-6">
-        {/* Question Info */}
-        <div className="bg-white dark:bg-dark-700 rounded-lg p-4 border dark:border-dark-600">
-          <div className="text-sm text-slate-600 dark:text-gray-400 mb-1">Current Question</div>
-          <div className="text-2xl font-bold text-slate-900 dark:text-gray-100">
-            {currentQuestion} of {totalQuestions}
-          </div>
-          <div className="w-full bg-slate-200 dark:bg-dark-600 rounded-full h-2 mt-2">
-            <div
-              className="bg-blue-600 dark:bg-blue-500 h-2 rounded-full transition-all duration-300"
-              style={{ width: `${(currentQuestion / totalQuestions) * 100}%` }}
-            />
-          </div>
+      <CardContent className="space-y-5">
+        <div className="rounded-lg border border-border bg-surface-raised p-4">
+          <p className="eyebrow">Current question</p>
+          <p className="mt-1 font-display text-2xl font-bold tabular text-foreground">
+            {currentQuestion} <span className="text-base font-medium text-muted-foreground">of {totalQuestions}</span>
+          </p>
+          <Progress className="mt-3" value={currentQuestion} max={totalQuestions} label="Quiz progress" />
         </div>
 
-        {/* Navigation Controls */}
-        <div className="flex space-x-3">
-          <Button
-            onClick={() => onQuestionChange('prev')}
-            disabled={!canGoPrev}
-            variant="outline"
-            className="flex-1"
-          >
-            ← Previous
+        <div className="grid grid-cols-2 gap-2">
+          <Button onClick={() => onQuestionChange('prev')} disabled={!canGoPrev} variant="outline">
+            <ChevronLeft /> Previous
           </Button>
-          <Button
-            onClick={() => onQuestionChange('next')}
-            disabled={!canGoNext}
-            className="flex-1"
-          >
-            Next →
+          <Button onClick={() => onQuestionChange('next')} disabled={!canGoNext} variant="secondary">
+            Next <ChevronRight />
           </Button>
         </div>
 
-        {/* Answer Reveal */}
-        <Button
-          onClick={handleRevealAnswer}
-          disabled={isRevealing || !questionData}
-          variant="secondary"
-          className="w-full"
-        >
-          {isRevealing ? (
-            <span className="flex items-center space-x-2">
-              <span className="animate-spin">🎯</span>
-              <span>Revealing...</span>
-            </span>
-          ) : (
-            '🎯 Reveal Answer'
-          )}
+        <Button onClick={handleRevealAnswer} disabled={isRevealing || !questionData} className="w-full">
+          <Eye /> {isRevealing ? 'Revealing…' : 'Reveal answer'}
         </Button>
 
-        {/* Reset Buzzer */}
-        <Button
-          onClick={onResetBuzzer}
-          variant="destructive"
-          className="w-full"
-        >
-          🔄 Reset Buzzer
+        <Button onClick={onResetBuzzer} variant="destructive" className="w-full">
+          <RotateCcw /> Reset buzzer
         </Button>
       </CardContent>
     </Card>

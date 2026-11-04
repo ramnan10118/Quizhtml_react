@@ -1,5 +1,6 @@
 import * as React from 'react'
-import { Card, CardContent, CardHeader, CardTitle, Button, Badge, cn } from '@/components/ui'
+import { ArrowRight, CalendarClock, Check, ListChecks, Zap } from 'lucide-react'
+import { Button, Badge, cn } from '@/components/ui'
 import { QuizMode, QuizSettings } from '@/types/quiz'
 
 const { useState } = React
@@ -9,47 +10,47 @@ interface QuizModeOption {
   title: string
   description: string
   features: string[]
-  icon: string
+  icon: React.ReactNode
   recommended?: boolean
 }
 
 const QUIZ_MODES: QuizModeOption[] = [
   {
     mode: 'buzzer',
-    title: 'Buzzer Quiz',
-    description: 'Real-time competitive quiz with buzzing system',
+    title: 'Buzzer',
+    description: 'Live, head-to-head. Fastest buzz wins the floor.',
     features: [
       'Live competitive buzzing',
       'Real-time leaderboards',
       'Host-controlled question flow',
       'Instant celebrations'
     ],
-    icon: '⚡',
+    icon: <Zap />,
     recommended: true
   },
   {
     mode: 'basic',
-    title: 'Basic Quiz',
-    description: 'Individual assessment at participant\'s own pace',
+    title: 'Self-paced',
+    description: 'Everyone answers on their own device, at their own pace.',
     features: [
       'Self-paced progression',
       'Immediate results',
       'Individual submissions',
       'Offline capability'
     ],
-    icon: '📝'
+    icon: <ListChecks />
   },
   {
     mode: 'scheduled',
-    title: 'Scheduled Quiz',
-    description: 'Async competitive with controlled reveals',
+    title: 'Scheduled reveal',
+    description: 'Collect answers first, then reveal results on your cue.',
     features: [
       'Collect submissions first',
       'Host-controlled reveals',
       'Leaderboard management',
       'Strategic result timing'
     ],
-    icon: '📅'
+    icon: <CalendarClock />
   }
 ]
 
@@ -60,18 +61,18 @@ interface QuizModeSelectorProps {
   isHost?: boolean
 }
 
-export function QuizModeSelector({ 
-  currentMode, 
-  onModeSelect, 
+export function QuizModeSelector({
+  currentMode,
+  onModeSelect,
   className,
-  isHost = false 
+  isHost = false
 }: QuizModeSelectorProps) {
   const [selectedMode, setSelectedMode] = useState<QuizMode>(currentMode || 'buzzer')
   const [showSettings, setShowSettings] = useState(false)
 
   const handleModeSelection = (mode: QuizMode) => {
     setSelectedMode(mode)
-    
+
     // Default settings for each mode
     const defaultSettings: QuizSettings = {
       mode,
@@ -80,7 +81,7 @@ export function QuizModeSelector({
       showCorrectAnswers: mode !== 'scheduled',
       passingScore: mode === 'basic' ? 70 : undefined
     }
-    
+
     onModeSelect(mode, defaultSettings)
   }
 
@@ -88,99 +89,89 @@ export function QuizModeSelector({
 
   return (
     <div className={cn('space-y-6', className)}>
-      <div className="text-center space-y-2">
-        <h2 className="text-2xl font-bold text-foreground">Choose Quiz Mode</h2>
-        <p className="text-muted-foreground">
-          {isHost ? 'Select how you want to run your quiz' : 'Select how you want to participate'}
-        </p>
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-3">
-        {QUIZ_MODES.map((mode) => (
-          <Card 
-            key={mode.mode}
-            className={cn(
-              'cursor-pointer transition-all duration-200 hover:shadow-lg',
-              selectedMode === mode.mode 
-                ? 'ring-2 ring-primary bg-primary/5' 
-                : 'hover:border-primary/50',
-              'relative'
-            )}
-            onClick={() => handleModeSelection(mode.mode)}
-          >
-            {mode.recommended && (
-              <Badge 
-                className="absolute -top-2 -right-2 bg-primary text-primary-foreground"
-                variant="default"
-              >
-                Popular
-              </Badge>
-            )}
-            
-            <CardHeader className="pb-3">
-              <div className="flex items-center space-x-3">
-                <span className="text-2xl" role="img" aria-label={mode.title}>
+      <div role="radiogroup" aria-label="Quiz mode" className="grid gap-4 md:grid-cols-3">
+        {QUIZ_MODES.map((mode, i) => {
+          const active = selectedMode === mode.mode
+          return (
+            <div
+              key={mode.mode}
+              role="radio"
+              tabIndex={0}
+              aria-checked={active}
+              onClick={() => handleModeSelection(mode.mode)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault()
+                  handleModeSelection(mode.mode)
+                }
+              }}
+              className={cn(
+                'group relative flex h-full cursor-pointer flex-col rounded-xl border bg-card p-5 text-left shadow-card transition-[border-color,box-shadow,transform] duration-150',
+                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background',
+                'animate-fade-up',
+                active
+                  ? 'border-primary ring-1 ring-primary/50 shadow-glow'
+                  : 'border-border hover:border-muted-foreground/50 hover:-translate-y-0.5'
+              )}
+              style={{ animationDelay: `${i * 60}ms` }}
+            >
+              <div className="mb-4 flex items-start justify-between gap-3">
+                <span
+                  className={cn(
+                    'flex h-11 w-11 items-center justify-center rounded-lg [&_svg]:size-5 transition-colors',
+                    active ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground group-hover:text-foreground'
+                  )}
+                >
                   {mode.icon}
                 </span>
-                <CardTitle className="text-lg">{mode.title}</CardTitle>
+                <div className="flex items-center gap-2">
+                  {mode.recommended && <Badge variant="secondary">Popular</Badge>}
+                  <span
+                    className={cn(
+                      'flex h-5 w-5 items-center justify-center rounded-full border transition-colors',
+                      active ? 'border-primary bg-primary text-primary-foreground' : 'border-border'
+                    )}
+                    aria-hidden="true"
+                  >
+                    {active && <Check className="h-3 w-3" />}
+                  </span>
+                </div>
               </div>
-              <p className="text-sm text-muted-foreground">
-                {mode.description}
-              </p>
-            </CardHeader>
-            
-            <CardContent className="space-y-3">
-              <ul className="space-y-2">
+              <h3 className="font-display text-lg font-semibold text-foreground">{mode.title}</h3>
+              <p className="mt-1 text-sm text-muted-foreground">{mode.description}</p>
+              <ul className="mt-4 space-y-1.5">
                 {mode.features.map((feature, index) => (
-                  <li key={index} className="flex items-center text-sm">
-                    <span className="w-1.5 h-1.5 bg-primary rounded-full mr-2 flex-shrink-0" />
+                  <li key={index} className="flex items-center gap-2 text-sm text-foreground/85">
+                    <span className={cn('h-1.5 w-1.5 shrink-0 rounded-full', active ? 'bg-primary' : 'bg-muted-foreground/50')} />
                     {feature}
                   </li>
                 ))}
               </ul>
-              
-              {selectedMode === mode.mode && (
-                <div className="pt-2 border-t">
-                  <Button 
-                    size="sm" 
+              {active && (
+                <div className="mt-5 border-t border-border pt-4">
+                  <Button
+                    size="sm"
                     className="w-full"
                     onClick={(e) => {
                       e.stopPropagation()
                       handleModeSelection(mode.mode)
                     }}
                   >
-                    {isHost ? 'Start Hosting' : 'Join Quiz'} →
+                    {isHost ? 'Start hosting' : 'Continue'} <ArrowRight />
                   </Button>
                 </div>
               )}
-            </CardContent>
-          </Card>
-        ))}
+            </div>
+          )
+        })}
       </div>
 
       {selectedModeData && (
-        <Card className="bg-muted/30">
-          <CardContent className="p-4">
-            <div className="flex items-start space-x-3">
-              <span className="text-xl mt-0.5">{selectedModeData.icon}</span>
-              <div className="flex-1">
-                <h3 className="font-semibold text-foreground mb-1">
-                  {selectedModeData.title} Selected
-                </h3>
-                <p className="text-sm text-muted-foreground mb-3">
-                  {selectedModeData.description}
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {selectedModeData.features.map((feature, index) => (
-                    <Badge key={index} variant="secondary" className="text-xs">
-                      {feature}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        <div className="flex flex-wrap items-center gap-2 rounded-lg border border-dashed border-border px-4 py-3 text-sm text-muted-foreground">
+          <span className="font-medium text-foreground">{selectedModeData.title}</span>
+          <span>selected.</span>
+          <span>{selectedModeData.description}</span>
+        </div>
       )}
     </div>
   )

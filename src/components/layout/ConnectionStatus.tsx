@@ -5,27 +5,33 @@ import { ConnectionStatus as ConnectionStatusType } from '@/types/quiz';
 interface ConnectionStatusProps {
   status: ConnectionStatusType;
   className?: string;
+  /** Hide the text label on small screens */
+  compact?: boolean;
 }
 
-export function ConnectionStatus({ status, className }: ConnectionStatusProps) {
+export function ConnectionStatus({ status, className, compact = false }: ConnectionStatusProps) {
+  // Strip any leading emoji the hook may prepend to the message.
+  const message = status.connectionMessage.replace(/^[^A-Za-z0-9]+/, '').trim();
   return (
     <div
+      role="status"
+      aria-live="polite"
+      title={message}
       className={cn(
-        'flex items-center space-x-2 px-3 py-1 rounded-full text-xs font-medium',
-        'transition-all duration-200',
+        'inline-flex h-7 items-center gap-1.5 rounded-full border px-2.5 text-xs font-medium',
         status.isConnected
-          ? 'bg-green-100 text-green-800 border border-green-200'
-          : 'bg-red-100 text-red-800 border border-red-200',
+          ? 'border-success/30 bg-success/10 text-success'
+          : 'border-destructive/30 bg-destructive/10 text-destructive',
         className
       )}
     >
-      <div
+      <span
         className={cn(
-          'w-2 h-2 rounded-full',
-          status.isConnected ? 'bg-green-500' : 'bg-red-500'
+          'h-1.5 w-1.5 rounded-full',
+          status.isConnected ? 'bg-success animate-live-dot' : 'bg-destructive'
         )}
       />
-      <span>{status.connectionMessage}</span>
+      <span className={cn(compact && 'sr-only sm:not-sr-only')}>{status.isConnected ? 'Connected' : message || 'Offline'}</span>
     </div>
   );
 }

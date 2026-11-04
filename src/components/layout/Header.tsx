@@ -1,5 +1,6 @@
 import * as React from 'react'
 import { cn } from '@/components/ui'
+import { BrandMark } from './BrandMark'
 
 interface HeaderProps {
   title: string
@@ -8,34 +9,30 @@ interface HeaderProps {
   children?: React.ReactNode
 }
 
+/**
+ * Compact session bar used on live screens (host, participant, polling).
+ * Brand mark on the left, page title + status line, actions on the right.
+ */
 export function Header({ title, subtitle, className, children }: HeaderProps) {
   return (
     <header
       className={cn(
-        'bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900',
-        'dark:from-background dark:via-card dark:to-background',
-        'backdrop-blur-md border-b border-border',
-        'text-white dark:text-foreground px-6 py-4 sticky top-0 z-50',
-        'shadow-xl shadow-slate-900/20 dark:shadow-background/40',
+        'sticky top-0 z-40 border-b border-border/80 bg-background/85 backdrop-blur-md supports-[backdrop-filter]:bg-background/70',
         className
       )}
     >
-      <div className="flex items-center justify-between">
-        <div className="flex flex-col">
-          <h1 className="text-xl sm:text-2xl font-bold tracking-tight">
+      <div className="mx-auto flex min-h-14 w-full max-w-7xl items-center gap-3 px-4 py-2 sm:px-6">
+        <BrandMark showWordmark={false} size="sm" />
+        <div className="h-5 w-px bg-border" aria-hidden="true" />
+        <div className="min-w-0 flex-1">
+          <h1 className="truncate font-display text-[15px] font-semibold leading-tight text-foreground sm:text-base">
             {title}
           </h1>
           {subtitle && (
-            <p className="text-slate-300 dark:text-muted-foreground text-sm mt-1 font-medium">
-              {subtitle}
-            </p>
+            <p className="truncate text-xs text-muted-foreground sm:text-[13px]">{subtitle}</p>
           )}
         </div>
-        {children && (
-          <div className="flex items-center space-x-4">
-            {children}
-          </div>
-        )}
+        {children && <div className="flex shrink-0 items-center gap-2">{children}</div>}
       </div>
     </header>
   )

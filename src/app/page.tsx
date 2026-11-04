@@ -3,8 +3,9 @@
 import React from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
+import { ArrowRight, BarChart3, LogOut, Sparkles, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
+import { BrandMark } from '@/components/layout/BrandMark';
 import { useAuth } from '@/contexts/AuthContext';
 
 export default function HomePage() {
@@ -29,147 +30,122 @@ export default function HomePage() {
     }
   }, [router, user]);
 
+  const features = [
+    {
+      icon: <Zap />,
+      title: 'Buzzer rounds',
+      body: 'Phones become buzzers. First tap wins the floor, scores update live, confetti included.',
+    },
+    {
+      icon: <BarChart3 />,
+      title: 'Live polls',
+      body: 'Ask the room, watch the bars move, and reveal results on your cue.',
+    },
+    {
+      icon: <Sparkles />,
+      title: 'AI question drafts',
+      body: 'Type a topic, get a round of multiple-choice questions you can edit and reorder.',
+    },
+  ];
+
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-dark-900">
+    <div className="app-bg min-h-screen">
       {/* Header */}
-      <header className="border-b border-gray-200 dark:border-dark-700 bg-white dark:bg-dark-800">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-          <Link href="/" className="text-xl font-semibold text-gray-900 dark:text-gray-100 hover:text-gray-700 dark:hover:text-gray-300">
-            Quiz Buzzer
-          </Link>
-          <div className="flex items-center space-x-4">
-{user ? (
+      <header className="sticky top-0 z-40 border-b border-border/80 bg-background/80 backdrop-blur-md">
+        <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4 sm:px-6">
+          <BrandMark />
+          <div className="flex items-center gap-2">
+            {user ? (
               <>
-                <span className="text-sm text-gray-600 dark:text-gray-400">
+                <span className="hidden max-w-[200px] truncate text-sm text-muted-foreground sm:inline">
                   {user.user_metadata?.full_name || user.email}
                 </span>
-                <Button
-                  onClick={handleSignOut}
-                  variant="outline"
-                  size="sm"
-                >
-                  Sign Out
+                <Button onClick={handleSignOut} variant="ghost" size="sm">
+                  <LogOut /> Sign out
                 </Button>
               </>
             ) : (
               <>
-                <Link href="/auth/login">
-                  <Button variant="outline" size="sm">
-                    Sign In
-                  </Button>
-                </Link>
-                <Link href="/auth/signup">
-                  <Button size="sm">
-                    Sign Up
-                  </Button>
-                </Link>
+                <Button variant="ghost" size="sm" asChild>
+                  <Link href="/auth/login">Sign in</Link>
+                </Button>
+                <Button size="sm" asChild>
+                  <Link href="/auth/signup">Sign up</Link>
+                </Button>
               </>
             )}
           </div>
         </div>
       </header>
-      
+
       {/* Hero Section */}
-      <div className="relative overflow-hidden">
-        <div className="max-w-7xl mx-auto px-6 py-16 sm:py-24">
-          <div className="text-center">
-            <h1 className="text-4xl font-bold tracking-tight text-gray-900 dark:text-gray-100 sm:text-6xl">
-              Create Amazing{' '}
-              <span className="text-blue-600">Quizzes</span> & <span className="text-green-600">Polls</span>
+      <section className="relative overflow-hidden">
+        <div className="mx-auto max-w-7xl px-4 py-20 sm:px-6 sm:py-28">
+          <div className="max-w-3xl animate-fade-up">
+            <p className="eyebrow mb-4">Live quizzes · buzzers · polls</p>
+            <h1 className="font-display text-4xl font-bold leading-[1.05] tracking-tight text-foreground sm:text-6xl">
+              Run the room like a <span className="text-primary">game show</span>.
             </h1>
-            <p className="mt-6 text-lg leading-8 text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
-              Build interactive quizzes and polls with real-time features. Perfect for education, events, and team building.
+            <p className="mt-6 max-w-2xl text-lg leading-8 text-muted-foreground">
+              Build a quiz in minutes, put a buzzer on every phone, and keep the scores, reveals and polls on one screen. Made for classrooms, team events and trivia nights.
             </p>
-            
-            <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
-              <Button
-                onClick={() => router.push('/mode')}
-                className="bg-blue-600 hover:bg-blue-700 text-lg px-8 py-3"
-              >
-                Get Started
+
+            <div className="mt-10 flex flex-col gap-3 sm:flex-row sm:items-center">
+              <Button onClick={() => router.push('/mode')} size="xl">
+                Get started <ArrowRight />
+              </Button>
+              <Button variant="outline" size="xl" asChild>
+                <Link href="/quiz/join">I have a join code</Link>
               </Button>
             </div>
           </div>
         </div>
-      </div>
+      </section>
 
       {/* Features Section */}
-      <div className="py-16 bg-white dark:bg-dark-800">
-        <div className="max-w-7xl mx-auto px-6">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl font-bold text-gray-900 dark:text-gray-100">
+      <section className="border-t border-border bg-surface/60 py-16 backdrop-blur-sm">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6">
+          <div className="mb-10 max-w-2xl">
+            <h2 className="font-display text-2xl font-bold text-foreground sm:text-3xl">
               Everything you need to engage your audience
             </h2>
-            <p className="mt-4 text-lg text-gray-600 dark:text-gray-400">
-              Powerful features to create, manage, and analyze your content
+            <p className="mt-3 text-base text-muted-foreground">
+              Create, run and analyze sessions without juggling three tools.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <Card>
-              <CardHeader>
-                <div className="text-center">
-                  <span className="text-4xl mb-4 block">🎯</span>
-                  <CardTitle>Interactive Quizzes</CardTitle>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <p className="text-gray-600 dark:text-gray-400 text-center">
-                  Create engaging quizzes with real-time buzzer system and instant scoring
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <div className="text-center">
-                  <span className="text-4xl mb-4 block">📊</span>
-                  <CardTitle>Live Polls</CardTitle>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <p className="text-gray-600 dark:text-gray-400 text-center">
-                  Gather instant feedback with live polling and real-time results
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <div className="text-center">
-                  <span className="text-4xl mb-4 block">🤖</span>
-                  <CardTitle>AI-Powered</CardTitle>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <p className="text-gray-600 dark:text-gray-400 text-center">
-                  Generate questions automatically and enhance content with AI assistance
-                </p>
-              </CardContent>
-            </Card>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+            {features.map((f, i) => (
+              <div
+                key={f.title}
+                className="rounded-xl border border-border bg-card p-6 shadow-card animate-fade-up"
+                style={{ animationDelay: `${i * 70}ms` }}
+              >
+                <span className="mb-4 flex h-10 w-10 items-center justify-center rounded-lg bg-primary/15 text-primary [&_svg]:size-5">
+                  {f.icon}
+                </span>
+                <h3 className="font-display text-lg font-semibold text-foreground">{f.title}</h3>
+                <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{f.body}</p>
+              </div>
+            ))}
           </div>
         </div>
-      </div>
+      </section>
 
       {/* CTA Section */}
-      <div className="bg-blue-600 dark:bg-blue-700 py-16">
-        <div className="max-w-7xl mx-auto px-6 text-center">
-          <h2 className="text-3xl font-bold text-white mb-4">
-            Ready to get started?
-          </h2>
-          <p className="text-xl text-blue-100 mb-8">
-            Join thousands of educators and event organizers using our platform
-          </p>
-          <div className="flex items-center justify-center">
-            <Button
-              onClick={() => router.push('/mode')}
-              className="bg-white text-blue-600 hover:bg-gray-100 text-lg px-8 py-3"
-            >
-              Get Started
+      <section className="py-16">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6">
+          <div className="flex flex-col items-start justify-between gap-6 rounded-2xl border border-primary/30 bg-primary/10 p-8 sm:flex-row sm:items-center sm:p-10">
+            <div>
+              <h2 className="font-display text-2xl font-bold text-foreground sm:text-3xl">Ready to get started?</h2>
+              <p className="mt-2 text-base text-muted-foreground">Join educators and event organizers hosting live sessions with Audience Voice.</p>
+            </div>
+            <Button onClick={() => router.push('/mode')} size="xl" className="shrink-0">
+              Get started <ArrowRight />
             </Button>
           </div>
         </div>
-      </div>
+      </section>
     </div>
   );
 }

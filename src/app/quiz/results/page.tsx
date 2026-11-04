@@ -2,9 +2,17 @@
 
 import React, { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Header } from '@/components/layout/Header';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
+import { AlertTriangle, ArrowLeft, BarChart3, CalendarClock, CheckCircle2, Clock, Eye, ListChecks, Settings2, Trophy, Users } from 'lucide-react';
+import { AppShell } from '@/components/layout/AppShell';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
+import { Badge } from '@/components/ui/badge';
+import { StatTile } from '@/components/ui/StatTile';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { Progress } from '@/components/ui/Progress';
+import { LoadingScreen } from '@/components/ui/Spinner';
+import { Leaderboard } from '@/components/quiz/Leaderboard';
+import { QuestionBreakdown } from '@/components/quiz/QuestionBreakdown';
 import { liveQuizzes, LiveQuiz } from '@/lib/drafts';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 
@@ -51,17 +59,7 @@ function QuizResultsPageContent() {
   if (loading) {
     return (
       <ProtectedRoute>
-        <div className="min-h-screen bg-gray-50 dark:bg-dark-900 dark">
-          <Header title="Loading Results..." subtitle="Please wait" />
-          <main className="max-w-4xl mx-auto p-6">
-            <div className="flex items-center justify-center py-12">
-              <div className="text-center">
-                <div className="animate-spin text-4xl mb-4">🔄</div>
-                <p className="text-gray-600 dark:text-gray-400">Loading quiz results...</p>
-              </div>
-            </div>
-          </main>
-        </div>
+        <LoadingScreen label="Loading quiz results..." />
       </ProtectedRoute>
     );
   }
@@ -69,25 +67,22 @@ function QuizResultsPageContent() {
   if (error || !quiz) {
     return (
       <ProtectedRoute>
-        <div className="min-h-screen bg-gray-50 dark:bg-dark-900 dark">
-          <Header title="Results Not Found" subtitle="Unable to load quiz data" />
-          <main className="max-w-4xl mx-auto p-6">
-            <Card>
-              <CardContent className="text-center py-16">
-                <div className="text-6xl mb-4">❌</div>
-                <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
-                  {error || 'Quiz results not available'}
-                </h3>
-                <p className="text-gray-500 dark:text-gray-400 mb-6">
-                  This quiz may have been deleted or is no longer accessible.
-                </p>
-                <Button onClick={handleBackToDashboard}>
-                  Back to Dashboard
-                </Button>
-              </CardContent>
-            </Card>
-          </main>
-        </div>
+        <AppShell backHref="/dashboard" backLabel="Dashboard" maxWidth="lg">
+          <Card>
+            <CardContent className="p-0">
+              <EmptyState
+                icon={<AlertTriangle />}
+                title={error || 'Quiz results not available'}
+                description="This quiz may have been deleted or is no longer accessible."
+                action={
+                  <Button onClick={handleBackToDashboard}>
+                    <ArrowLeft /> Back to dashboard
+                  </Button>
+                }
+              />
+            </CardContent>
+          </Card>
+        </AppShell>
       </ProtectedRoute>
     );
   }
@@ -96,138 +91,172 @@ function QuizResultsPageContent() {
   const totalQuestions = quiz.content?.questions?.length || 0;
   const participantCount = quiz.content?.submissions?.length || 0;
   const leaderboard = quiz.content?.leaderboard || [];
+  const submissions = quiz.content?.submissions || [];
+  const questions = quiz.content?.questions || [];
+  const completedSubmissions = submissions.filter(s => s.isComplete).length;
+  const completionRate = participantCount > 0 ? Math.round((completedSubmissions / participantCount) * 100) : 0;
+  const isCompleted = quiz.status === 'completed';
+  const settings = quiz.content?.settings;
 
   return (
     <ProtectedRoute>
-      <div className="min-h-screen bg-gray-50 dark:bg-dark-900 dark">
-        <Header 
-          title={`Results: ${quiz.title}`} 
-          subtitle={`${totalQuestions} questions • ${participantCount} participants • ${quiz.status === 'completed' ? 'Completed' : 'In Progress'}`}
-        >
-          <Button onClick={handleBackToDashboard} variant="outline" size="sm">
-            Back to Dashboard
-          </Button>
-        </Header>
+      <AppShell
+        backHref="/dashboard"
+        backLabel="Dashboard"
+        eyebrow="Quiz results"
+        title={quiz.title}
+        subtitle={`Scheduled reveal · created ${new Date(quiz.created_at).toLocaleDateString(undefined, { dateStyle: 'medium' })}`}
+        headingActions={
+          <>
+            <Badge variant={isCompleted ? 'success' : 'live'} className="h-8 px-3 text-xs">
+              {isCompleted ? <CheckCircle2 /> : null}
+              {isCompleted ? 'Completed' : 'In progress'}
+            </Badge>
+            {!isCompleted && (
+              <Button variant="outline" size="sm" onClick={() => router.push(`/quiz/host?live=${quiz.id}`)}>
+                Open host view
+              </Button>
+            )}
+          </>
+        }
+      >
+        <div className="space-y-6">
+          {/* Overview */}
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            <StatTile label="Participants" value={participantCount} tone="primary" icon={<Users />} hint={`${completedSubmissions} submitted`} />
+            <StatTile label="Questions" value={totalQuestions} icon={<ListChecks />} />
+            <StatTile label="Revealed" value={`${revealedCount}/${totalQuestions}`} tone="success" icon={<Eye />} hint={totalQuestions > 0 ? `${Math.round((revealedCount / totalQuestions) * 100)}% released` : undefined} />
+            <StatTile label="Completion" value={`${completionRate}%`} tone="info" icon={<BarChart3 />} hint="of participants submitted" />
+          </div>
 
-        <main className="max-w-6xl mx-auto p-6">
-          {/* Overview Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-            <Card>
-              <CardContent className="p-4 text-center">
-                <div className="text-2xl font-bold text-blue-600">{totalQuestions}</div>
-                <div className="text-sm text-muted-foreground">Total Questions</div>
+          <div className="grid gap-6 lg:grid-cols-5">
+            {/* Leaderboard */}
+            <Card className="lg:col-span-2">
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2">
+                  <Trophy className="h-4 w-4 text-primary" /> {isCompleted ? 'Final leaderboard' : 'Leaderboard'}
+                </CardTitle>
+                <CardDescription>
+                  {leaderboard.length > 0 ? `Top ${Math.min(10, leaderboard.length)} of ${leaderboard.length}` : 'Rankings appear once answers are revealed'}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Leaderboard
+                  maxRows={10}
+                  emptyTitle="No rankings yet"
+                  emptyDescription="Reveal questions from the host view to build the leaderboard."
+                  rows={leaderboard.map((entry, index) => ({
+                    rank: entry.rank ?? index + 1,
+                    name: entry.participantName,
+                    score: entry.score,
+                    percentage: entry.questionsRevealed > 0 ? Math.round((entry.score / entry.questionsRevealed) * 100) : 0,
+                    meta: entry.submissionTime ? `Submitted ${new Date(entry.submissionTime).toLocaleTimeString([], { timeStyle: 'short' })}` : undefined,
+                  }))}
+                />
               </CardContent>
             </Card>
-            
-            <Card>
-              <CardContent className="p-4 text-center">
-                <div className="text-2xl font-bold text-green-600">{revealedCount}</div>
-                <div className="text-sm text-muted-foreground">Questions Revealed</div>
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardContent className="p-4 text-center">
-                <div className="text-2xl font-bold text-purple-600">{participantCount}</div>
-                <div className="text-sm text-muted-foreground">Participants</div>
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardContent className="p-4 text-center">
-                <div className={`text-2xl font-bold ${quiz.status === 'completed' ? 'text-green-600' : 'text-orange-600'}`}>
-                  {quiz.status === 'completed' ? '✅' : '⏳'}
-                </div>
-                <div className="text-sm text-muted-foreground">
-                  {quiz.status === 'completed' ? 'Completed' : 'In Progress'}
-                </div>
+
+            {/* Per-question breakdown */}
+            <Card className="lg:col-span-3">
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2">
+                  <BarChart3 className="h-4 w-4 text-primary" /> Question breakdown
+                </CardTitle>
+                <CardDescription>Correct-answer rate and how answers were distributed, per question.</CardDescription>
+                {totalQuestions > 0 && (
+                  <div className="pt-2">
+                    <div className="mb-1 flex justify-between text-xs text-muted-foreground tabular">
+                      <span>Revealed</span>
+                      <span>{revealedCount}/{totalQuestions}</span>
+                    </div>
+                    <Progress value={revealedCount} max={totalQuestions} tone="success" />
+                  </div>
+                )}
+              </CardHeader>
+              <CardContent>
+                {participantCount === 0 ? (
+                  <EmptyState
+                    compact
+                    icon={<Users />}
+                    title="No participants yet"
+                    description="This quiz hasn't received any submissions, so there is nothing to break down."
+                  />
+                ) : (
+                  <QuestionBreakdown
+                    questions={questions}
+                    submissions={submissions}
+                    revealedQuestions={quiz.content?.revealedQuestions}
+                  />
+                )}
               </CardContent>
             </Card>
           </div>
 
-          {/* Leaderboard */}
-          {leaderboard.length > 0 && (
-            <Card className="mb-8">
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <span>🏆</span>
-                  <span>Final Leaderboard</span>
+          {/* Settings + timeline */}
+          <div className="grid gap-6 md:grid-cols-2">
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2">
+                  <Settings2 className="h-4 w-4 text-primary" /> Settings
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-3">
-                  {leaderboard.slice(0, 10).map((entry, index) => (
-                    <div key={index} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-dark-700 rounded-lg">
-                      <div className="flex items-center space-x-3">
-                        <span className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
-                          index === 0 ? 'bg-yellow-500 text-white' :
-                          index === 1 ? 'bg-gray-400 text-white' :
-                          index === 2 ? 'bg-amber-600 text-white' :
-                          'bg-gray-200 dark:bg-dark-600 text-gray-700 dark:text-gray-300'
-                        }`}>
-                          {index + 1}
-                        </span>
-                        <span className="font-medium">{entry.participantName}</span>
-                      </div>
-                      <div className="text-right">
-                        <div className="font-bold">{entry.score} points</div>
-                        {entry.submissionTime && (
-                          <div className="text-xs text-muted-foreground">
-                            Submitted {new Date(entry.submissionTime).toLocaleTimeString()}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                <dl className="divide-y divide-border text-sm">
+                  <div className="flex items-center justify-between py-2.5">
+                    <dt className="text-muted-foreground">Mode</dt>
+                    <dd className="font-medium text-foreground">Scheduled reveal</dd>
+                  </div>
+                  <div className="flex items-center justify-between py-2.5">
+                    <dt className="text-muted-foreground">Show correct answers</dt>
+                    <dd><Badge variant={settings?.showCorrectAnswers ? 'success' : 'secondary'}>{settings?.showCorrectAnswers ? 'Yes' : 'No'}</Badge></dd>
+                  </div>
+                  <div className="flex items-center justify-between py-2.5">
+                    <dt className="text-muted-foreground">Time limit</dt>
+                    <dd className="font-medium text-foreground tabular">{settings?.timeLimit ? `${settings.timeLimit}s per question` : 'None'}</dd>
+                  </div>
+                  <div className="flex items-center justify-between py-2.5">
+                    <dt className="text-muted-foreground">Passing score</dt>
+                    <dd className="font-medium text-foreground tabular">{settings?.passingScore ? `${settings.passingScore}%` : 'None'}</dd>
+                  </div>
+                  <div className="flex items-center justify-between py-2.5">
+                    <dt className="text-muted-foreground">Leaderboard</dt>
+                    <dd className="font-medium text-foreground">{quiz.content?.leaderboardVisible ? 'Visible to participants' : 'Hidden'}</dd>
+                  </div>
+                </dl>
               </CardContent>
             </Card>
-          )}
 
-          {/* Quiz Details */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Quiz Details</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <h4 className="font-medium mb-2">Timeline</h4>
-                  <div className="space-y-1 text-sm text-muted-foreground">
-                    <div>Created: {new Date(quiz.created_at).toLocaleString()}</div>
-                    <div>Last Updated: {new Date(quiz.updated_at).toLocaleString()}</div>
-                  </div>
-                </div>
-                
-                <div>
-                  <h4 className="font-medium mb-2">Settings</h4>
-                  <div className="space-y-1 text-sm text-muted-foreground">
-                    <div>Mode: Scheduled Quiz</div>
-                    <div>Show Correct Answers: {quiz.content?.settings?.showCorrectAnswers ? 'Yes' : 'No'}</div>
-                    {quiz.content?.settings?.timeLimit && (
-                      <div>Time Limit: {quiz.content.settings.timeLimit}s per question</div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {participantCount === 0 && (
-            <Card className="mt-6">
-              <CardContent className="text-center py-8">
-                <div className="text-4xl mb-4">👥</div>
-                <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
-                  No Participants Yet
-                </h3>
-                <p className="text-gray-500 dark:text-gray-400">
-                  This quiz hasn&apos;t received any submissions.
-                </p>
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2">
+                  <CalendarClock className="h-4 w-4 text-primary" /> Timeline
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ol className="relative space-y-4 border-l border-border pl-5">
+                  <li className="relative">
+                    <span className="absolute -left-[25px] top-1 flex h-3 w-3 items-center justify-center rounded-full bg-primary ring-4 ring-background" />
+                    <p className="text-sm font-medium text-foreground">Created</p>
+                    <p className="text-xs text-muted-foreground tabular">{new Date(quiz.created_at).toLocaleString()}</p>
+                  </li>
+                  <li className="relative">
+                    <span className="absolute -left-[25px] top-1 flex h-3 w-3 items-center justify-center rounded-full bg-muted-foreground/60 ring-4 ring-background" />
+                    <p className="text-sm font-medium text-foreground">Last updated</p>
+                    <p className="text-xs text-muted-foreground tabular">{new Date(quiz.updated_at).toLocaleString()}</p>
+                  </li>
+                  <li className="relative">
+                    <span className={`absolute -left-[25px] top-1 flex h-3 w-3 items-center justify-center rounded-full ring-4 ring-background ${isCompleted ? 'bg-success' : 'bg-warning animate-live-dot'}`} />
+                    <p className="text-sm font-medium text-foreground">{isCompleted ? 'Completed' : 'Still running'}</p>
+                    <p className="flex items-center gap-1 text-xs text-muted-foreground">
+                      <Clock className="h-3 w-3" /> {isCompleted ? 'All questions revealed' : `${totalQuestions - revealedCount} questions still hidden`}
+                    </p>
+                  </li>
+                </ol>
               </CardContent>
             </Card>
-          )}
-        </main>
-      </div>
+          </div>
+        </div>
+      </AppShell>
     </ProtectedRoute>
   );
 }

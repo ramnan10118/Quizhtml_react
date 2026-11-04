@@ -3,8 +3,9 @@
 import React from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
+import { ArrowRight, Briefcase, GraduationCap, LogOut, PartyPopper, Vote, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
+import { BrandMark } from '@/components/layout/BrandMark';
 import { useAuth } from '@/contexts/AuthContext';
 
 export default function ModeSelectionPage() {
@@ -27,149 +28,134 @@ export default function ModeSelectionPage() {
     }
   };
 
+  const modes = [
+    {
+      icon: <Zap />,
+      title: 'Interactive quizzes',
+      description: 'Engage your audience with buzzer rounds, self-paced quizzes and scheduled reveals.',
+      features: [
+        'Buzzer mode with real-time competition',
+        'Self-paced mode for individual answers',
+        'Scheduled mode with controlled reveals',
+        'AI-generated questions on any topic',
+      ],
+      joinHref: '/quiz/join',
+      joinLabel: 'Join a quiz',
+    },
+    {
+      icon: <Vote />,
+      title: 'Live polling',
+      description: 'Capture opinions in seconds and show the results as they come in.',
+      features: [
+        'Custom question creation',
+        'Up to 6 answer options',
+        'Live result visualization',
+        'Real-time vote tracking',
+      ],
+      joinHref: '/polling/join',
+      joinLabel: 'Join a poll',
+    },
+  ];
+
+  const useCases = [
+    { icon: <Briefcase />, title: 'Corporate', body: 'Team building and training' },
+    { icon: <GraduationCap />, title: 'Education', body: 'Classroom engagement' },
+    { icon: <PartyPopper />, title: 'Entertainment', body: 'Parties and events' },
+  ];
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-dark-900 dark">
+    <div className="app-bg min-h-screen">
       {/* Header */}
-      <header className="border-b border-gray-200 dark:border-dark-700 bg-white dark:bg-dark-800">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-          <Link href="/" className="text-xl font-semibold text-gray-900 dark:text-gray-100 hover:text-gray-700 dark:hover:text-gray-300">
-            Audience Voice
-          </Link>
-          <div className="flex items-center space-x-4">
-{user ? (
+      <header className="sticky top-0 z-40 border-b border-border/80 bg-background/80 backdrop-blur-md">
+        <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4 sm:px-6">
+          <BrandMark />
+          <div className="flex items-center gap-2">
+            {user ? (
               <>
-                <span className="text-sm text-gray-600 dark:text-gray-400">
+                <span className="hidden max-w-[200px] truncate text-sm text-muted-foreground sm:inline">
                   {user.user_metadata?.full_name || user.email}
                 </span>
-                <Button
-                  onClick={handleSignOut}
-                  variant="outline"
-                  size="sm"
-                >
-                  Sign Out
+                <Button onClick={handleSignOut} variant="ghost" size="sm">
+                  <LogOut /> Sign out
                 </Button>
               </>
             ) : (
               <>
-                <Link href="/auth/login">
-                  <Button variant="outline" size="sm">
-                    Sign In
-                  </Button>
-                </Link>
-                <Link href="/auth/signup">
-                  <Button size="sm">
-                    Sign Up
-                  </Button>
-                </Link>
+                <Button variant="ghost" size="sm" asChild>
+                  <Link href="/auth/login">Sign in</Link>
+                </Button>
+                <Button size="sm" asChild>
+                  <Link href="/auth/signup">Sign up</Link>
+                </Button>
               </>
             )}
           </div>
         </div>
       </header>
-      
+
       {/* Main Content */}
-      <main className="flex items-center justify-center min-h-[calc(100vh-80px)] px-6 py-16">
-        <div className="w-full max-w-4xl">
-          <div className="text-center mb-16">
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-4">
-              Choose Your Mode
-            </h1>
-            <p className="text-lg text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
-              Select the type of interactive experience you want to create
-            </p>
-          </div>
-
-          <div className="grid md:grid-cols-2 gap-8 max-w-3xl mx-auto">
-            {/* Quiz Mode Card */}
-            <Card className="hover:shadow-lg transition-shadow duration-200">
-              <CardHeader className="text-center">
-                <div className="w-16 h-16 bg-primary-100 dark:bg-primary-900/30 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                  <span className="text-2xl">🎯</span>
-                </div>
-                <CardTitle className="text-xl text-gray-900 dark:text-gray-100">Interactive Quizzes</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <p className="text-gray-600 dark:text-gray-400 text-left">
-                  Engage your audience with interactive quizzes.
-                </p>
-                <div className="space-y-3">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-2 h-2 bg-primary-500 dark:bg-primary-400 rounded-full"></div>
-                    <span className="text-sm text-gray-700 dark:text-gray-300">Buzzer mode with real-time competition</span>
-                  </div>
-                  <div className="flex items-center space-x-3">
-                    <div className="w-2 h-2 bg-primary-500 dark:bg-primary-400 rounded-full"></div>
-                    <span className="text-sm text-gray-700 dark:text-gray-300">Basic mode for self-paced quizzes</span>
-                  </div>
-                  <div className="flex items-center space-x-3">
-                    <div className="w-2 h-2 bg-primary-500 dark:bg-primary-400 rounded-full"></div>
-                    <span className="text-sm text-gray-700 dark:text-gray-300">Scheduled mode with controlled reveals</span>
-                  </div>
-                  <div className="flex items-center space-x-3">
-                    <div className="w-2 h-2 bg-primary-500 dark:bg-primary-400 rounded-full"></div>
-                    <span className="text-sm text-gray-700 dark:text-gray-300">AI-generated questions on any topic</span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Polling Mode Card */}
-            <Card className="hover:shadow-lg transition-shadow duration-200">
-              <CardHeader className="text-center">
-                <div className="w-16 h-16 bg-primary-100 dark:bg-primary-900/30 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                  <span className="text-2xl">🗳️</span>
-                </div>
-                <CardTitle className="text-xl text-gray-900 dark:text-gray-100">Live Polling</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <p className="text-gray-600 dark:text-gray-400 text-left">
-                  Capture audience opinions with live polling.
-                </p>
-                <div className="space-y-3">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-2 h-2 bg-primary-500 dark:bg-primary-400 rounded-full"></div>
-                    <span className="text-sm text-gray-700 dark:text-gray-300">Custom question creation</span>
-                  </div>
-                  <div className="flex items-center space-x-3">
-                    <div className="w-2 h-2 bg-primary-500 dark:bg-primary-400 rounded-full"></div>
-                    <span className="text-sm text-gray-700 dark:text-gray-300">Up to 6 answer options</span>
-                  </div>
-                  <div className="flex items-center space-x-3">
-                    <div className="w-2 h-2 bg-primary-500 dark:bg-primary-400 rounded-full"></div>
-                    <span className="text-sm text-gray-700 dark:text-gray-300">Live result visualization</span>
-                  </div>
-                  <div className="flex items-center space-x-3">
-                    <div className="w-2 h-2 bg-primary-500 dark:bg-primary-400 rounded-full"></div>
-                    <span className="text-sm text-gray-700 dark:text-gray-300">Real-time vote tracking</span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Use Cases */}
-          <div className="mt-24 text-center">
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-8">Perfect for Any Event</h2>
-            <div className="grid md:grid-cols-3 gap-6 max-w-2xl mx-auto">
-              <div className="space-y-2">
-                <div className="text-2xl">🏢</div>
-                <h3 className="font-medium text-gray-900 dark:text-gray-100">Corporate</h3>
-                <p className="text-gray-500 dark:text-gray-400 text-sm">Team building & training</p>
-              </div>
-              <div className="space-y-2">
-                <div className="text-2xl">🎓</div>
-                <h3 className="font-medium text-gray-900 dark:text-gray-100">Education</h3>
-                <p className="text-gray-500 dark:text-gray-400 text-sm">Classroom engagement</p>
-              </div>
-              <div className="space-y-2">
-                <div className="text-2xl">🎉</div>
-                <h3 className="font-medium text-gray-900 dark:text-gray-100">Entertainment</h3>
-                <p className="text-gray-500 dark:text-gray-400 text-sm">Parties & events</p>
-              </div>
-            </div>
-          </div>
+      <main className="mx-auto max-w-5xl px-4 py-12 sm:px-6 sm:py-20">
+        <div className="mb-12 max-w-2xl animate-fade-up">
+          <p className="eyebrow mb-3">Two ways to run a session</p>
+          <h1 className="font-display text-3xl font-bold text-foreground sm:text-5xl">
+            Quizzes for competition. Polls for opinions.
+          </h1>
+          <p className="mt-4 text-lg text-muted-foreground">
+            Hosting needs an account. Joining never does: participants just open a link on their phone.
+          </p>
         </div>
+
+        <div className="grid gap-5 md:grid-cols-2">
+          {modes.map((mode, i) => (
+            <article
+              key={mode.title}
+              className="flex flex-col rounded-2xl border border-border bg-card p-6 shadow-card animate-fade-up sm:p-7"
+              style={{ animationDelay: `${i * 80}ms` }}
+            >
+              <span className="mb-5 flex h-12 w-12 items-center justify-center rounded-xl bg-primary/15 text-primary [&_svg]:size-6">
+                {mode.icon}
+              </span>
+              <h2 className="font-display text-xl font-semibold text-foreground">{mode.title}</h2>
+              <p className="mt-2 text-sm text-muted-foreground">{mode.description}</p>
+              <ul className="mt-5 space-y-2.5">
+                {mode.features.map((feature) => (
+                  <li key={feature} className="flex items-center gap-3 text-sm text-foreground/90">
+                    <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
+                    {feature}
+                  </li>
+                ))}
+              </ul>
+              <div className="mt-7 flex flex-col gap-2 border-t border-border pt-5 sm:flex-row">
+                <Button asChild className="flex-1">
+                  <Link href={user ? '/dashboard' : '/auth/login'}>
+                    Host a session <ArrowRight />
+                  </Link>
+                </Button>
+                <Button variant="outline" asChild className="flex-1">
+                  <Link href={mode.joinHref}>{mode.joinLabel}</Link>
+                </Button>
+              </div>
+            </article>
+          ))}
+        </div>
+
+        {/* Use Cases */}
+        <section className="mt-20">
+          <h2 className="eyebrow mb-6 text-center">Perfect for any event</h2>
+          <div className="grid gap-4 sm:grid-cols-3">
+            {useCases.map((u) => (
+              <div key={u.title} className="flex items-center gap-4 rounded-xl border border-border bg-card/60 p-4">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground [&_svg]:size-5">
+                  {u.icon}
+                </span>
+                <div>
+                  <h3 className="text-sm font-semibold text-foreground">{u.title}</h3>
+                  <p className="text-xs text-muted-foreground">{u.body}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
       </main>
     </div>
   );

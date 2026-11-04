@@ -1,13 +1,18 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { io, Socket } from 'socket.io-client';
+import { AlertTriangle, CheckCircle2, LayoutDashboard, Plus, Save, Vote, X } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
-import { Card } from '@/components/ui/Card';
+import { Card, CardContent } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
-// import { Header } from '@/components/layout/Header';
+import { Label } from '@/components/ui/label';
+import { Spinner, LoadingScreen } from '@/components/ui/Spinner';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { AppShell } from '@/components/layout/AppShell';
+import { ConnectionStatus } from '@/components/layout/ConnectionStatus';
 import { SharePanel } from '@/components/ui/SharePanel';
 import { PollCreator } from '@/components/polling/PollCreator';
 import { PollResults } from '@/components/polling/PollResults';
@@ -21,29 +26,29 @@ import { useAuth } from '@/contexts/AuthContext';
 function PollingHostContent() {
   const searchParams = useSearchParams();
   const { user } = useAuth();
-  
+
   const [socket, setSocket] = useState<Socket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [showCreator, setShowCreator] = useState(false);
   const [pollResults, setPollResults] = useState<PollResultsType | null>(null);
   const [showResults, setShowResults] = useState(false);
-  
+
   // Draft functionality state
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [draftName, setDraftName] = useState('');
   const [saving, setSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
-  
+
   // Poll data state for saving to drafts
   const [pollData, setPollData] = useState<PollCreateData | null>(null);
-  
+
   // Live poll persistence
   const [currentLivePollId, setCurrentLivePollId] = useState<string | null>(null);
   const currentLivePollIdRef = useRef<string | null>(null);
-  
+
   // Socket poll ID (different from database ID)
   const [socketPollId, setSocketPollId] = useState<string | null>(null);
-  
+
   const {
     pollState,
     setCurrentPoll,
@@ -84,16 +89,16 @@ function PollingHostContent() {
       console.log('Current live poll ID (ref):', currentLivePollIdRef.current);
       updatePoll(data.poll);
       setPollResults(data.results);
-      
+
       // Update database with latest vote data - use ref to get current value
       const pollIdToUpdate = currentLivePollIdRef.current;
       if (pollIdToUpdate && data.results) {
         try {
           // Convert poll results back to votes object format
           const votes: Record<string, number> = {};
-          
+
           console.log('Raw poll results data:', data.results);
-          
+
           // Check if voterNames exists (it's an object, not array)
           if (data.results.voterNames && typeof data.results.voterNames === 'object') {
             console.log('Processing voterNames:', data.results.voterNames);
@@ -109,9 +114,9 @@ function PollingHostContent() {
           } else {
             console.log('No voterNames found or not an object:', data.results.voterNames);
           }
-          
+
           console.log('Saving votes to database:', votes);
-          
+
           // Update database asynchronously
           livePolls.updateContent(pollIdToUpdate, {
             question: data.results.question,
@@ -153,7 +158,7 @@ function PollingHostContent() {
       const draftId = searchParams.get('draft');
       if (draftId && user) {
         setErrorMessage('');
-        
+
         try {
           const draft = await pollDrafts.getById(draftId);
           if (draft) {
@@ -177,13 +182,13 @@ function PollingHostContent() {
     const loadSpecificLivePoll = async () => {
       const livePollId = searchParams.get('live');
       if (!livePollId || !user) return;
-      
+
       try {
         const specificLivePoll = await livePolls.getById(livePollId);
         if (specificLivePoll) {
           setCurrentLivePollId(specificLivePoll.id);
           currentLivePollIdRef.current = specificLivePoll.id;
-          
+
           // Create a Poll object from the LivePoll data
           const pollFromDb: Poll = {
             id: specificLivePoll.id,
@@ -194,20 +199,20 @@ function PollingHostContent() {
             showResults: specificLivePoll.content.showResults || false,
             createdAt: new Date(specificLivePoll.created_at).getTime()
           };
-          
+
           setCurrentPoll(pollFromDb);
           setShowCreator(false);
-          
+
           // Restore existing votes data if available
           console.log('Live poll content:', specificLivePoll.content);
           if (specificLivePoll.content.votes && Object.keys(specificLivePoll.content.votes).length > 0) {
             console.log('Found existing votes:', specificLivePoll.content.votes);
-            
+
             // Convert votes object to poll results format
             const voteCounts: number[] = new Array(specificLivePoll.content.options.length).fill(0);
             const voterNames: string[][] = specificLivePoll.content.options.map(() => []);
             let totalVotes = 0;
-            
+
             // Process votes data
             Object.entries(specificLivePoll.content.votes).forEach(([voterName, optionIndex]) => {
               if (typeof optionIndex === 'number' && optionIndex >= 0 && optionIndex < voteCounts.length) {
@@ -216,7 +221,7 @@ function PollingHostContent() {
                 totalVotes++;
               }
             });
-            
+
             // Set poll results to restore the votes display
             const restoredResults: PollResultsType = {
               pollId: specificLivePoll.id,
@@ -229,7 +234,7 @@ function PollingHostContent() {
               }, {} as Record<number, string[]>),
               totalVotes
             };
-            
+
             console.log('Restored results:', restoredResults);
             setPollResults(restoredResults);
           } else {
@@ -253,10 +258,10 @@ function PollingHostContent() {
           question: pollData.question,
           options: pollData.options
         });
-        
+
         setCurrentLivePollId(livePoll.id);
         currentLivePollIdRef.current = livePoll.id;
-        
+
         // Then emit to socket with the database ID
         socket.emit('create-poll', { ...pollData, id: livePoll.id });
       } catch (error) {
@@ -286,7 +291,7 @@ function PollingHostContent() {
         question: pollData.question,
         options: pollData.options
       });
-      
+
       setShowSaveModal(false);
       setDraftName('');
       setErrorMessage('Draft saved successfully!');
@@ -317,7 +322,7 @@ function PollingHostContent() {
       if (socketPollId) {
         socket.emit('close-poll', socketPollId);
       }
-      
+
       // Update database if we have a live poll ID
       if (currentLivePollId) {
         try {
@@ -328,10 +333,10 @@ function PollingHostContent() {
           console.error('Error closing live poll in database:', error);
         }
       }
-      
+
       // Clear socket poll ID since we're closing
       setSocketPollId(null);
-      
+
       // Fallback: Update UI after a short delay if socket doesn't respond
       setTimeout(() => {
         if (pollState.currentPoll && pollState.currentPoll.isActive) {
@@ -359,242 +364,200 @@ function PollingHostContent() {
   const currentPoll = pollState.currentPoll;
   // const hasActivePoll = currentPoll?.isActive;
 
+  // ---- Presentation-only helpers ----
+  const closeSaveModal = () => {
+    setShowSaveModal(false);
+    setDraftName('');
+    setErrorMessage('');
+  };
+  const isSuccessMessage = errorMessage.includes('successfully');
+  const steps = [
+    { n: 1, title: 'Create a poll', body: 'Write your question and add 2–6 answer options.' },
+    { n: 2, title: 'Share the link', body: 'Participants join at /polling/join on any device.' },
+    { n: 3, title: 'Watch results', body: 'See votes land in real time and reveal them when you choose.' },
+  ];
+
   return (
     <ProtectedRoute>
-      <div className="min-h-screen bg-gray-50 dark:bg-dark-900 dark">
-      {/* Header */}
-      <header className="border-b border-gray-200 dark:border-dark-700 bg-white dark:bg-dark-800">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <Link href="/mode" className="text-xl font-semibold text-gray-900 dark:text-gray-100 hover:text-gray-700 dark:hover:text-gray-300">
-              Quiz Buzzer
-            </Link>
-            <div className="text-gray-400 dark:text-gray-600">→</div>
-            <span className="text-gray-600 dark:text-gray-400">Polling Host</span>
-          </div>
-          <div className="flex items-center space-x-3">
-            <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`} />
-            <span className="text-sm text-gray-600 dark:text-gray-400">
-              {isConnected ? 'Connected' : 'Connecting...'}
-            </span>
-          </div>
-        </div>
-      </header>
-      
-      <main className="flex-1 p-6">
-        <div className="max-w-7xl mx-auto">
-          {/* Welcome Section */}
-          {!currentPoll && !showCreator && (
-            <div className="text-center mb-8">
-              <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-4">
-                Host Live Polling Session
-              </h1>
-              <p className="text-lg text-gray-600 dark:text-gray-400 mb-8 max-w-2xl mx-auto">
-                Create engaging polls and see real-time audience responses
-              </p>
-              <Button
-                onClick={handleNewPoll}
-                size="lg"
-                disabled={!isConnected}
-              >
-                Create Your First Poll
-              </Button>
-            </div>
-          )}
+      <AppShell
+        nav={[
+          { href: '/dashboard', label: 'Dashboard', icon: <LayoutDashboard /> },
+          { href: '/polling/host', label: 'Polls', icon: <Vote />, prefix: true },
+        ]}
+        actions={<ConnectionStatus status={{ isConnected, connectionMessage: isConnected ? 'Connected' : 'Connecting...' }} compact />}
+        eyebrow="Live polling"
+        title={currentPoll ? 'Poll in progress' : showCreator ? 'Create a poll' : 'Host a polling session'}
+        subtitle={currentPoll ? 'Control results visibility and close the poll when you are done.' : 'Ask the room a question and watch the answers come in.'}
+        headingActions={
+          showCreator && !currentPoll ? (
+            <Button onClick={() => setShowCreator(false)} variant="ghost" size="sm">
+              <X /> Cancel
+            </Button>
+          ) : !currentPoll ? (
+            <Button onClick={handleNewPoll} disabled={!isConnected}>
+              <Plus /> New poll
+            </Button>
+          ) : undefined
+        }
+      >
+        {/* Welcome Section */}
+        {!currentPoll && !showCreator && (
+          <div className="space-y-8">
+            <Card>
+              <CardContent className="p-0">
+                <EmptyState
+                  icon={<Vote />}
+                  title="No poll running"
+                  description="Create your first poll to open the session. Participants can join as soon as it is live."
+                  action={
+                    <Button onClick={handleNewPoll} size="lg" disabled={!isConnected}>
+                      {isConnected ? <Plus /> : <Spinner size="sm" />}
+                      {isConnected ? 'Create your first poll' : 'Connecting…'}
+                    </Button>
+                  }
+                />
+              </CardContent>
+            </Card>
 
-          {/* Poll Creator */}
-          {showCreator && (
-            <div className="mb-8">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Create New Poll</h2>
-                <Button
-                  onClick={() => setShowCreator(false)}
-                  variant="outline"
-                  size="sm"
-                >
-                  Cancel
-                </Button>
-              </div>
-              <PollCreator
-                onCreatePoll={handleCreatePoll}
-                isCreating={!isConnected}
-                initialData={pollData}
-                onDataChange={handlePollDataChange}
-                onSaveDraft={handleOpenSaveModal}
-                showSaveDraft={user !== null}
+            {/* Instructions */}
+            <div className="grid gap-4 md:grid-cols-3">
+              {steps.map((s, i) => (
+                <div key={s.n} className="rounded-xl border border-border bg-card p-5 shadow-card animate-fade-up" style={{ animationDelay: `${i * 60}ms` }}>
+                  <span className="mb-3 flex h-8 w-8 items-center justify-center rounded-md bg-primary/15 font-display text-sm font-bold text-primary tabular">
+                    {s.n}
+                  </span>
+                  <h3 className="font-display text-base font-semibold text-foreground">{s.title}</h3>
+                  <p className="mt-1 text-sm text-muted-foreground">{s.body}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Poll Creator */}
+        {showCreator && (
+          <div className="mx-auto max-w-3xl animate-fade-up">
+            <PollCreator
+              onCreatePoll={handleCreatePoll}
+              isCreating={!isConnected}
+              initialData={pollData}
+              onDataChange={handlePollDataChange}
+              onSaveDraft={handleOpenSaveModal}
+              showSaveDraft={user !== null}
+            />
+          </div>
+        )}
+
+        {/* Active Poll Section */}
+        {currentPoll && (
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
+            {/* Middle: Poll Results */}
+            <div className="lg:col-span-8 lg:order-2">
+              {pollResults ? (
+                <PollResults
+                  results={pollResults}
+                  showParticipants={showResults}
+                />
+              ) : (
+                <Card className="stage-bg">
+                  <CardContent className="p-6 sm:p-8">
+                    <p className="eyebrow mb-2">Question</p>
+                    <h3 className="font-display text-xl font-semibold leading-snug text-foreground sm:text-2xl">
+                      {currentPoll.question}
+                    </h3>
+                    <ul className="mt-5 space-y-2">
+                      {currentPoll.options.map((opt, i) => (
+                        <li key={i} className="flex items-center gap-3 rounded-lg border border-border bg-surface px-3 py-2.5 text-sm">
+                          <span className="flex h-7 w-7 items-center justify-center rounded-md bg-muted font-display text-xs font-bold text-muted-foreground">
+                            {String.fromCharCode(65 + i)}
+                          </span>
+                          {opt}
+                        </li>
+                      ))}
+                    </ul>
+                    <div className="mt-6 flex items-center gap-2 rounded-lg border border-dashed border-border px-3 py-2.5 text-sm text-muted-foreground">
+                      <Spinner size="sm" /> Waiting for the first vote. Share the link from the invite panel.
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+
+            {/* Left: Poll Controls */}
+            <div className="space-y-6 lg:col-span-4 lg:order-1">
+              <PollControls
+                currentPoll={currentPoll}
+                onClosePoll={handleClosePoll}
+                onToggleResults={handleToggleResults}
+                onNewPoll={handleNewPoll}
+                showResults={showResults}
+                totalVotes={pollResults?.totalVotes || 0}
+              />
+              {/* Right: Share Panel */}
+              <SharePanel
+                joinPath="/polling/join"
+                title="Invite voters"
+                description="Share with participants to join the poll."
               />
             </div>
-          )}
-
-          {/* Active Poll Section */}
-          {currentPoll && (
-            <div className="grid lg:grid-cols-4 gap-6">
-              {/* Left: Poll Controls */}
-              <div className="lg:col-span-1">
-                <PollControls
-                  currentPoll={currentPoll}
-                  onClosePoll={handleClosePoll}
-                  onToggleResults={handleToggleResults}
-                  onNewPoll={handleNewPoll}
-                  showResults={showResults}
-                  totalVotes={pollResults?.totalVotes || 0}
-                />
-              </div>
-
-              {/* Middle: Poll Results */}
-              <div className="lg:col-span-2">
-                {pollResults ? (
-                  <PollResults
-                    results={pollResults}
-                    showParticipants={showResults}
-                  />
-                ) : (
-                  <Card className="p-8 text-center">
-                    <div className="text-4xl mb-4">⏳</div>
-                    <h3 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-2">
-                      Waiting for votes...
-                    </h3>
-                    <p className="text-gray-600 dark:text-gray-400">
-                      Use the share panel on the right to invite participants to join your poll
-                    </p>
-                  </Card>
-                )}
-              </div>
-
-              {/* Right: Share Panel */}
-              <div className="lg:col-span-1">
-                <SharePanel
-                  joinPath="/polling/join"
-                  title="Invite Voters"
-                  description="Share with participants to join the poll"
-                />
-              </div>
-            </div>
-          )}
-
-          {/* Instructions */}
-          {!currentPoll && !showCreator && (
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mt-12">
-              <div className="bg-white/5 dark:bg-dark-800/50 rounded-lg p-6 backdrop-blur border border-gray-200 dark:border-dark-700">
-                <div className="text-3xl mb-4">1️⃣</div>
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">Create Poll</h3>
-                <p className="text-gray-600 dark:text-gray-400 text-sm">
-                  Write your question and add 2-6 answer options for participants to choose from
-                </p>
-              </div>
-              <div className="bg-white/5 dark:bg-dark-800/50 rounded-lg p-6 backdrop-blur border border-gray-200 dark:border-dark-700">
-                <div className="text-3xl mb-4">2️⃣</div>
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">Share Link</h3>
-                <p className="text-gray-600 dark:text-gray-400 text-sm">
-                  Participants join at /polling/join to vote on your live polls
-                </p>
-              </div>
-              <div className="bg-white/5 dark:bg-dark-800/50 rounded-lg p-6 backdrop-blur border border-gray-200 dark:border-dark-700">
-                <div className="text-3xl mb-4">3️⃣</div>
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">View Results</h3>
-                <p className="text-gray-600 dark:text-gray-400 text-sm">
-                  Watch real-time results and control when to show them to participants
-                </p>
-              </div>
-            </div>
-          )}
-        </div>
-      </main>
+          </div>
+        )}
+      </AppShell>
 
       {/* Save Draft Modal */}
-      {showSaveModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-dark-800 rounded-lg shadow-xl max-w-md w-full">
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
-                  Save Poll as Draft
-                </h2>
-                <button
-                  onClick={() => {
-                    setShowSaveModal(false);
-                    setDraftName('');
-                    setErrorMessage('');
-                  }}
-                  className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
-                >
-                  <span className="sr-only">Close</span>
-                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-              
-              <div className="space-y-4">
-                <div>
-                  <label htmlFor="draftName" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Draft Name
-                  </label>
-                  <Input
-                    id="draftName"
-                    value={draftName}
-                    onChange={(e) => setDraftName(e.target.value)}
-                    placeholder="Enter a name for your poll draft"
-                    disabled={saving}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        handleSaveDraft();
-                      }
-                    }}
-                  />
-                </div>
-                
-                <div className="flex justify-end space-x-3">
-                  <Button
-                    onClick={() => {
-                      setShowSaveModal(false);
-                      setDraftName('');
-                      setErrorMessage('');
-                    }}
-                    variant="outline"
-                    disabled={saving}
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    onClick={handleSaveDraft}
-                    disabled={saving || !draftName.trim()}
-                  >
-                    {saving ? (
-                      <span className="flex items-center space-x-2">
-                        <span className="animate-spin text-sm">🔄</span>
-                        <span>Saving...</span>
-                      </span>
-                    ) : (
-                      'Save Draft'
-                    )}
-                  </Button>
-                </div>
-              </div>
-            </div>
+      <Dialog open={showSaveModal} onOpenChange={(open) => { if (!open) closeSaveModal(); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Save poll as draft</DialogTitle>
+            <DialogDescription>Give the draft a name so you can find it on your dashboard.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="draftName">Draft name</Label>
+            <Input
+              id="draftName"
+              value={draftName}
+              onChange={(e) => setDraftName(e.target.value)}
+              placeholder="e.g. Icebreaker: favourite season"
+              disabled={saving}
+              autoFocus
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  handleSaveDraft();
+                }
+              }}
+            />
           </div>
-        </div>
-      )}
+          <DialogFooter>
+            <Button onClick={closeSaveModal} variant="outline" disabled={saving}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveDraft} disabled={saving || !draftName.trim()}>
+              {saving ? <Spinner size="sm" /> : <Save />}
+              {saving ? 'Saving…' : 'Save draft'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Error Message */}
       {errorMessage && (
-        <div className="fixed top-4 right-4 max-w-sm bg-white dark:bg-dark-800 border-l-4 border-blue-500 p-4 shadow-lg rounded z-50">
-          <p className="text-sm text-gray-700 dark:text-gray-300">{errorMessage}</p>
+        <div
+          role="status"
+          className={`fixed bottom-4 right-4 z-50 flex max-w-sm items-start gap-3 rounded-xl border bg-card p-4 shadow-raised animate-fade-up ${
+            isSuccessMessage ? 'border-success/40' : 'border-destructive/40'
+          }`}
+        >
+          {isSuccessMessage ? <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-success" /> : <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />}
+          <p className="text-sm text-foreground">{errorMessage}</p>
         </div>
       )}
-      </div>
     </ProtectedRoute>
   );
 }
 
 export default function PollingHostPage() {
   return (
-    <React.Suspense fallback={<div className="min-h-screen bg-gray-50 dark:bg-dark-900 flex items-center justify-center">
-      <div className="text-center">
-        <div className="animate-spin text-4xl mb-4">🔄</div>
-        <p className="text-gray-600 dark:text-gray-400">Loading polling setup...</p>
-      </div>
-    </div>}>
+    <React.Suspense fallback={<LoadingScreen label="Loading polling setup..." />}>
       <PollingHostContent />
     </React.Suspense>
   );

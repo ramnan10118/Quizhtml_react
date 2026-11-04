@@ -3,10 +3,14 @@
 import React, { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { AlertTriangle, ArrowRight } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
+import { AuthLayout } from '@/components/layout/AuthLayout'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
+import { Label } from '@/components/ui/label'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Spinner, LoadingScreen } from '@/components/ui/Spinner'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -48,104 +52,72 @@ export default function LoginPage() {
   }
 
   if (user) {
-    return (
-      <div className="min-h-screen bg-gray-50 dark:bg-dark-900 flex items-center justify-center">
-        <div className="flex items-center space-x-2">
-          <span className="animate-spin text-2xl">🔄</span>
-          <span className="text-gray-600 dark:text-gray-400">Redirecting...</span>
-        </div>
-      </div>
-    )
+    return <LoadingScreen label="Redirecting to your dashboard..." />
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-dark-900 flex items-center justify-center px-6">
-      <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <Link href="/" className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-            Quiz Buzzer
+    <AuthLayout
+      title="Welcome back"
+      subtitle="Sign in to host quizzes and polls."
+      footer={
+        <p>
+          Don&apos;t have an account?{' '}
+          <Link href="/auth/signup" className="font-medium text-primary hover:underline focus-ring rounded">
+            Sign up
           </Link>
-          <p className="mt-2 text-gray-600 dark:text-gray-400">
-            Sign in to your account
-          </p>
+        </p>
+      }
+    >
+      <form onSubmit={handleSubmit} className="space-y-5">
+        {error && (
+          <Alert variant="destructive">
+            <AlertTriangle />
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+
+        <div className="space-y-2">
+          <Label htmlFor="email">Email</Label>
+          <Input
+            id="email"
+            name="email"
+            type="email"
+            autoComplete="email"
+            required
+            value={formData.email}
+            onChange={handleChange}
+            placeholder="you@example.com"
+            disabled={loading}
+          />
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-center">Welcome Back</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              {error && (
-                <div className="p-3 text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
-                  {error}
-                </div>
-              )}
+        <div className="space-y-2">
+          <Label htmlFor="password">Password</Label>
+          <Input
+            id="password"
+            name="password"
+            type="password"
+            autoComplete="current-password"
+            required
+            value={formData.password}
+            onChange={handleChange}
+            placeholder="Your password"
+            disabled={loading}
+          />
+        </div>
 
-              <div>
-                <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Email
-                </label>
-                <Input
-                  id="email"
-                  name="email"
-                  type="email"
-                  required
-                  value={formData.email}
-                  onChange={handleChange}
-                  placeholder="Enter your email"
-                  disabled={loading}
-                />
-              </div>
-
-              <div>
-                <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Password
-                </label>
-                <Input
-                  id="password"
-                  name="password"
-                  type="password"
-                  required
-                  value={formData.password}
-                  onChange={handleChange}
-                  placeholder="Enter your password"
-                  disabled={loading}
-                />
-              </div>
-
-              <Button
-                type="submit"
-                className="w-full"
-                disabled={loading}
-              >
-                {loading ? (
-                  <span className="flex items-center space-x-2">
-                    <span className="animate-spin">🔄</span>
-                    <span>Signing in...</span>
-                  </span>
-                ) : (
-                  'Sign In'
-                )}
-              </Button>
-
-              <div className="text-center space-y-2">
-                <p className="text-sm text-gray-600 dark:text-gray-400">
-                  Don&apos;t have an account?{' '}
-                  <Link href="/auth/signup" className="text-blue-600 hover:text-blue-700 font-medium">
-                    Sign up
-                  </Link>
-                </p>
-                <p className="text-sm">
-                  <Link href="/mode" className="text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200">
-                    Continue without account
-                  </Link>
-                </p>
-              </div>
-            </form>
-          </CardContent>
-        </Card>
-      </div>
-    </div>
+        <Button type="submit" className="w-full" size="lg" disabled={loading}>
+          {loading ? (
+            <>
+              <Spinner size="sm" /> Signing in…
+            </>
+          ) : (
+            <>
+              Sign in <ArrowRight />
+            </>
+          )}
+        </Button>
+      </form>
+    </AuthLayout>
   )
 }

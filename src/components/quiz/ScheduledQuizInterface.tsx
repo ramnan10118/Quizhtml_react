@@ -1,7 +1,10 @@
 import * as React from 'react'
-import { Card, CardContent, CardHeader, CardTitle, Button, Badge, cn } from '@/components/ui'
+import { ArrowLeft, CheckCircle2, ChevronLeft, ChevronRight, Clock, Eye, EyeOff, HelpCircle, Megaphone, Send, Trophy, XCircle } from 'lucide-react'
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, Button, Badge, Progress, cn } from '@/components/ui'
 import { QuizQuestion, ParticipantAnswer, LeaderboardEntry, RevealState } from '@/types/quiz'
 import { getOptionLabel } from '@/lib/utils'
+import { AnswerOption, type AnswerOptionState } from './AnswerOption'
+import { Leaderboard } from './Leaderboard'
 
 const { useState, useEffect } = React
 
@@ -59,9 +62,9 @@ export function ScheduledQuizInterface({
 
   const handleSubmit = async () => {
     if (isSubmitting) return
-    
+
     setIsSubmitting(true)
-    
+
     // Fill in missing answers with -1
     const completeAnswers: ParticipantAnswer[] = questions.map((_, index) => {
       const existingAnswer = answers.find(a => a.questionIndex === index)
@@ -93,124 +96,87 @@ export function ScheduledQuizInterface({
     return revealedQuestions.filter(r => r.isRevealed).length
   }
 
+  const announcementsCard = announcements.length > 0 && (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="flex items-center gap-2 text-base">
+          <Megaphone className="h-4 w-4 text-primary" /> Announcements
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-2">
+        {announcements.slice(-3).map((announcement, index) => (
+          <div key={index} className="rounded-lg border border-border bg-surface-raised px-3 py-2.5 text-sm animate-fade-up">
+            <p className="text-foreground">{announcement.message}</p>
+            <p className="mt-1 text-[11px] text-muted-foreground tabular">
+              {new Date(announcement.timestamp).toLocaleTimeString()}
+            </p>
+          </div>
+        ))}
+      </CardContent>
+    </Card>
+  )
+
   if (currentView === 'waiting') {
     return (
-      <div className={cn('w-full max-w-2xl mx-auto space-y-6', className)}>
-        <Card className="text-center">
-          <CardHeader>
-            <div className="mx-auto mb-4 w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center">
-              <span className="text-2xl">⏳</span>
+      <div className={cn('w-full max-w-2xl mx-auto space-y-4 animate-fade-up', className)}>
+        <Card className="stage-bg text-center">
+          <CardHeader className="items-center">
+            <div className="mb-2 flex h-14 w-14 items-center justify-center rounded-full bg-success/15 text-success">
+              <CheckCircle2 className="h-7 w-7" />
             </div>
-            <CardTitle>Answers Submitted!</CardTitle>
-            <p className="text-muted-foreground">
-              Waiting for host to reveal results...
-            </p>
+            <CardTitle className="text-xl">Answers submitted</CardTitle>
+            <CardDescription>
+              Sit tight. The host will reveal results when they are ready.
+            </CardDescription>
           </CardHeader>
-          
+
           <CardContent className="space-y-4">
-            <div className="text-sm text-muted-foreground">
-              You answered {getAnsweredCount()} out of {questions.length} questions
-            </div>
-            
-            {getRevealedCount() > 0 && (
-              <div>
-                <Badge variant="default" className="mb-2">
-                  {getRevealedCount()} questions revealed
+            <p className="text-sm text-muted-foreground tabular">
+              You answered {getAnsweredCount()} of {questions.length} questions
+            </p>
+
+            {getRevealedCount() > 0 ? (
+              <div className="flex flex-col items-center gap-3">
+                <Badge variant="success">
+                  <Eye /> {getRevealedCount()} question{getRevealedCount() === 1 ? '' : 's'} revealed
                 </Badge>
-                <Button 
-                  onClick={() => setCurrentView('results')}
-                  size="sm"
-                >
-                  View Results
-                </Button>
+                <Button onClick={() => setCurrentView('results')}>View results</Button>
+              </div>
+            ) : (
+              <div className="inline-flex items-center gap-2 rounded-full border border-border px-3 py-1 text-xs text-muted-foreground">
+                <Clock className="h-3.5 w-3.5 animate-pulse-slow" /> Waiting for the host
               </div>
             )}
           </CardContent>
         </Card>
 
-        {/* Recent Announcements */}
-        {announcements.length > 0 && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-sm">📢 Announcements</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              {announcements.slice(-3).map((announcement, index) => (
-                <div key={index} className="p-2 bg-muted rounded text-sm">
-                  <p>{announcement.message}</p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {new Date(announcement.timestamp).toLocaleTimeString()}
-                  </p>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-        )}
+        {announcementsCard}
       </div>
     )
   }
 
   if (currentView === 'results') {
     return (
-      <div className={cn('w-full max-w-4xl mx-auto space-y-6', className)}>
+      <div className={cn('w-full max-w-4xl mx-auto space-y-4 animate-fade-up', className)}>
         {/* Leaderboard */}
         {leaderboardVisible && leaderboard.length > 0 && (
           <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <span>🏆</span>
-                <span>Leaderboard</span>
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2">
+                <Trophy className="h-4 w-4 text-primary" /> Leaderboard
               </CardTitle>
             </CardHeader>
-            
             <CardContent>
-              <div className="space-y-2">
-                {leaderboard.map((entry, index) => {
-                  const isCurrentUser = entry.participantName === participantName
-                  
-                  return (
-                    <div
-                      key={index}
-                      className={cn(
-                        'flex items-center justify-between p-3 rounded-lg',
-                        isCurrentUser 
-                          ? 'bg-primary/10 border border-primary/20' 
-                          : 'bg-muted/30'
-                      )}
-                    >
-                      <div className="flex items-center space-x-3">
-                        <div className={cn(
-                          'flex items-center justify-center w-8 h-8 rounded-full text-sm font-bold',
-                          entry.rank === 1 ? 'bg-yellow-500 text-white' :
-                          entry.rank === 2 ? 'bg-gray-400 text-white' :
-                          entry.rank === 3 ? 'bg-amber-600 text-white' :
-                          'bg-muted text-muted-foreground'
-                        )}>
-                          {entry.rank}
-                        </div>
-                        <div>
-                          <div className={cn(
-                            'font-medium',
-                            isCurrentUser ? 'text-primary' : 'text-foreground'
-                          )}>
-                            {entry.participantName}
-                            {isCurrentUser && <span className="ml-2 text-xs">(You)</span>}
-                          </div>
-                          <div className="text-xs text-muted-foreground">
-                            {entry.questionsRevealed} questions revealed
-                          </div>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <div className="font-semibold">{entry.score} pts</div>
-                        <div className="text-xs text-muted-foreground">
-                          {Math.round((entry.score / entry.questionsRevealed) * 100)}%
-                        </div>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
+              <Leaderboard
+                highlightName={participantName}
+                rows={leaderboard.map((entry) => ({
+                  rank: entry.rank,
+                  name: entry.participantName,
+                  score: entry.score,
+                  percentage: Math.round((entry.score / entry.questionsRevealed) * 100),
+                  meta: `${entry.questionsRevealed} revealed`,
+                }))}
+              />
             </CardContent>
           </Card>
         )}
@@ -218,33 +184,34 @@ export function ScheduledQuizInterface({
         {/* Revealed Questions */}
         <Card>
           <CardHeader>
-            <CardTitle>Question Results</CardTitle>
-            <p className="text-sm text-muted-foreground">
+            <CardTitle>Question results</CardTitle>
+            <CardDescription className="tabular">
               {getRevealedCount()} of {questions.length} questions revealed
-            </p>
+            </CardDescription>
+            <Progress value={getRevealedCount()} max={questions.length} tone="success" className="mt-2" />
           </CardHeader>
-          
-          <CardContent className="space-y-6">
+
+          <CardContent className="divide-y divide-border">
             {questions.map((question, questionIndex) => {
               // Safety check for undefined question
               if (!question) {
                 return null;
               }
-              
+
               const revealInfo = revealedQuestions.find(r => r.questionIndex === questionIndex)
               const isRevealed = revealInfo?.isRevealed || false
               const userAnswer = answers.find(a => a.questionIndex === questionIndex)
               const selectedOption = userAnswer?.selectedOption || -1
-              
+
               if (!isRevealed) {
                 return (
-                  <div key={questionIndex} className="p-4 bg-muted/30 rounded-lg">
-                    <div className="flex items-center space-x-2">
-                      <span className="text-muted-foreground">⏳</span>
-                      <span className="text-sm text-muted-foreground">
-                        Question {questionIndex + 1} - Not revealed yet
-                      </span>
-                    </div>
+                  <div key={questionIndex} className="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
+                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
+                      <EyeOff className="h-3.5 w-3.5" />
+                    </span>
+                    <span className="text-sm text-muted-foreground">
+                      Question {questionIndex + 1} · not revealed yet
+                    </span>
                   </div>
                 )
               }
@@ -253,65 +220,46 @@ export function ScheduledQuizInterface({
               const wasAnswered = selectedOption !== -1
 
               return (
-                <div key={questionIndex} className="space-y-3">
-                  <div className="flex items-start space-x-3">
-                    <div className={cn(
-                      'flex items-center justify-center w-8 h-8 rounded-full text-sm font-semibold flex-shrink-0',
-                      isCorrect 
-                        ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                        : wasAnswered
-                        ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-                        : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400'
-                    )}>
-                      {isCorrect ? '✓' : wasAnswered ? '✗' : '?'}
-                    </div>
-                    
-                    <div className="flex-1">
-                      <h3 className="font-medium text-foreground mb-2">
-                        {questionIndex + 1}. {question.text}
-                      </h3>
-                      
-                      <div className="space-y-2">
-                        {question.options.map((option, optionIndex) => {
-                          const isSelected = selectedOption === optionIndex
-                          const isCorrectOption = optionIndex === question.correct
-                          
-                          return (
-                            <div
-                              key={optionIndex}
-                              className={cn(
-                                'p-2 rounded border',
-                                isCorrectOption
-                                  ? 'border-green-500 bg-green-50 dark:bg-green-900/20'
-                                  : isSelected && !isCorrect
-                                  ? 'border-red-500 bg-red-50 dark:bg-red-900/20'
-                                  : 'border-border'
-                              )}
-                            >
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center space-x-2">
-                                  <span className="text-xs font-medium">
-                                    {getOptionLabel(optionIndex)}
-                                  </span>
-                                  <span className="text-sm">{option}</span>
-                                </div>
-                                <div className="flex items-center space-x-1">
-                                  {isSelected && (
-                                    <Badge variant="secondary" className="text-xs">
-                                      Your Answer
-                                    </Badge>
-                                  )}
-                                  {isCorrectOption && (
-                                    <Badge className="text-xs bg-green-600">
-                                      Correct
-                                    </Badge>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                          )
-                        })}
-                      </div>
+                <div key={questionIndex} className="flex items-start gap-3 py-5 first:pt-0 last:pb-0">
+                  <div className={cn(
+                    'mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md [&_svg]:size-4',
+                    isCorrect
+                      ? 'bg-success/15 text-success'
+                      : wasAnswered
+                      ? 'bg-destructive/15 text-destructive'
+                      : 'bg-muted text-muted-foreground'
+                  )}>
+                    {isCorrect ? <CheckCircle2 /> : wasAnswered ? <XCircle /> : <HelpCircle />}
+                  </div>
+
+                  <div className="min-w-0 flex-1">
+                    <h3 className="text-sm font-semibold leading-snug text-foreground">
+                      <span className="text-muted-foreground tabular">{questionIndex + 1}.</span> {question.text}
+                    </h3>
+
+                    <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                      {question.options.map((option, optionIndex) => {
+                        const isSelected = selectedOption === optionIndex
+                        const isCorrectOption = optionIndex === question.correct
+                        let state: AnswerOptionState = 'default'
+                        if (isCorrectOption) state = 'correct'
+                        else if (isSelected && !isCorrect) state = 'wrong'
+
+                        return (
+                          <AnswerOption
+                            key={optionIndex}
+                            label={getOptionLabel(optionIndex)}
+                            text={option}
+                            state={state}
+                            trailing={
+                              <>
+                                {isSelected && <Badge variant="secondary">Yours</Badge>}
+                                {isCorrectOption && <Badge variant="success">Correct</Badge>}
+                              </>
+                            }
+                          />
+                        )
+                      })}
                     </div>
                   </div>
                 </div>
@@ -320,12 +268,11 @@ export function ScheduledQuizInterface({
           </CardContent>
         </Card>
 
+        {announcementsCard}
+
         <div className="text-center">
-          <Button 
-            variant="outline" 
-            onClick={() => setCurrentView('waiting')}
-          >
-            Back to Waiting Room
+          <Button variant="ghost" onClick={() => setCurrentView('waiting')}>
+            <ArrowLeft /> Back to waiting room
           </Button>
         </div>
       </div>
@@ -334,129 +281,89 @@ export function ScheduledQuizInterface({
 
   // Quiz View
   const currentQuestion = questions[currentQuestionIndex]
-  
+
   // Handle case where questions haven't loaded yet or currentQuestion is undefined
   if (!currentQuestion) {
     return (
       <div className={cn('w-full max-w-4xl mx-auto space-y-6', className)}>
         <Card>
           <CardContent className="p-8 text-center">
-            <div className="space-y-4">
-              <div className="text-lg font-medium text-foreground">
-                Loading Quiz... 📚
-              </div>
-              <div className="text-muted-foreground">
-                Waiting for questions to load...
-              </div>
-            </div>
+            <p className="font-display text-base font-semibold text-foreground">Loading quiz</p>
+            <p className="mt-1 text-sm text-muted-foreground">Waiting for questions from the host…</p>
           </CardContent>
         </Card>
       </div>
     )
   }
-  
+
   return (
-    <div className={cn('w-full max-w-4xl mx-auto space-y-6', className)}>
+    <div className={cn('w-full max-w-4xl mx-auto space-y-4', className)}>
       {/* Progress Header */}
-      <Card>
-        <CardContent className="p-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <span className="text-sm font-medium">
-                Question {currentQuestionIndex + 1} of {questions.length}
-              </span>
-              <div className="w-48 bg-muted rounded-full h-2">
-                <div 
-                  className="bg-primary h-2 rounded-full transition-all duration-300"
-                  style={{ width: `${((currentQuestionIndex + 1) / questions.length) * 100}%` }}
-                />
-              </div>
-            </div>
-            <Badge variant="secondary">
-              {getAnsweredCount()} answered
-            </Badge>
-          </div>
-        </CardContent>
-      </Card>
+      <div>
+        <div className="mb-1.5 flex items-center justify-between text-xs">
+          <span className="font-semibold text-foreground tabular">
+            Question {currentQuestionIndex + 1} <span className="font-medium text-muted-foreground">of {questions.length}</span>
+          </span>
+          <Badge variant="secondary" className="tabular">{getAnsweredCount()} answered</Badge>
+        </div>
+        <Progress value={currentQuestionIndex + 1} max={questions.length} label="Question progress" />
+      </div>
 
       {/* Question */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-xl md:text-2xl leading-tight">
+      <Card className="stage-bg">
+        <CardHeader className="pb-4">
+          <CardTitle className="text-xl leading-snug sm:text-2xl">
             {currentQuestion.text}
           </CardTitle>
+          <CardDescription>Tap an option to select your answer. You can change it before submitting.</CardDescription>
         </CardHeader>
-        
-        <CardContent className="space-y-3">
+
+        <CardContent className="space-y-2.5">
           {currentQuestion.options.map((option, index) => {
             const isSelected = getCurrentAnswer() === index
-            
+
             return (
-              <button
+              <AnswerOption
                 key={index}
-                onClick={() => handleAnswer(index)}
-                className={cn(
-                  'w-full p-4 rounded-lg border-2 text-left transition-all duration-200',
-                  'hover:bg-accent hover:border-accent-foreground/20',
-                  isSelected
-                    ? 'border-primary bg-primary/5 text-primary'
-                    : 'border-border bg-background'
-                )}
-              >
-                <div className="flex items-center space-x-3">
-                  <span
-                    className={cn(
-                      'flex items-center justify-center w-8 h-8 rounded-full text-sm font-semibold',
-                      isSelected
-                        ? 'bg-primary text-primary-foreground'
-                        : 'bg-muted text-muted-foreground'
-                    )}
-                  >
-                    {getOptionLabel(index)}
-                  </span>
-                  <span className="flex-1 text-sm md:text-base">
-                    {option}
-                  </span>
-                  {isSelected && (
-                    <span className="text-primary">✓</span>
-                  )}
-                </div>
-              </button>
+                size="lg"
+                label={getOptionLabel(index)}
+                text={option}
+                state={isSelected ? 'selected' : 'default'}
+                onSelect={() => handleAnswer(index)}
+                trailing={isSelected ? <CheckCircle2 className="h-5 w-5 text-primary" /> : undefined}
+              />
             )
           })}
         </CardContent>
       </Card>
 
       {/* Navigation */}
-      <Card>
-        <CardContent className="p-4">
-          <div className="flex items-center justify-between">
-            <Button
-              variant="outline"
-              onClick={() => setCurrentQuestionIndex(prev => Math.max(0, prev - 1))}
-              disabled={currentQuestionIndex === 0}
-            >
-              ← Previous
-            </Button>
+      <div className="flex items-center justify-between gap-3">
+        <Button
+          variant="outline"
+          size="lg"
+          onClick={() => setCurrentQuestionIndex(prev => Math.max(0, prev - 1))}
+          disabled={currentQuestionIndex === 0}
+          aria-label="Previous question"
+        >
+          <ChevronLeft /> <span className="hidden sm:inline">Previous</span>
+        </Button>
 
-            {currentQuestionIndex === questions.length - 1 ? (
-              <Button
-                onClick={handleSubmit}
-                disabled={isSubmitting}
-                className="min-w-[140px]"
-              >
-                {isSubmitting ? 'Submitting...' : 'Submit Answers'}
-              </Button>
-            ) : (
-              <Button
-                onClick={() => setCurrentQuestionIndex(prev => Math.min(questions.length - 1, prev + 1))}
-              >
-                Next →
-              </Button>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+        {currentQuestionIndex === questions.length - 1 ? (
+          <Button onClick={handleSubmit} disabled={isSubmitting} size="lg" className="min-w-[150px]">
+            <Send /> {isSubmitting ? 'Submitting…' : 'Submit answers'}
+          </Button>
+        ) : (
+          <Button
+            size="lg"
+            variant="secondary"
+            className="min-w-[120px]"
+            onClick={() => setCurrentQuestionIndex(prev => Math.min(questions.length - 1, prev + 1))}
+          >
+            Next <ChevronRight />
+          </Button>
+        )}
+      </div>
     </div>
   )
 }

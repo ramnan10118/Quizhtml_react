@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
-import { Header } from '@/components/layout/Header';
+import { AppShell } from '@/components/layout/AppShell';
 import { QuizModeSelector } from '@/components/quiz/QuizModeSelector';
 import { QuizMode, QuizSettings } from '@/types/quiz';
 
@@ -18,16 +18,16 @@ export default function QuizPage() {
 
   return (
     <ProtectedRoute>
-      <div className="min-h-screen bg-gray-50 dark:bg-dark-900 dark">
-        <Header 
-          title="Choose Quiz Mode" 
-          subtitle="Select the type of quiz you want to create"
-        />
-        
-        <main className="max-w-4xl mx-auto p-6">
-          <QuizModeSelector onModeSelect={handleModeSelect} />
-        </main>
-      </div>
+      <AppShell
+        backHref="/dashboard"
+        backLabel="Dashboard"
+        eyebrow="New quiz · step 1 of 2"
+        title="Choose a quiz mode"
+        subtitle="Pick how participants will play. You can add questions on the next step."
+        maxWidth="xl"
+      >
+        <QuizModeSelector onModeSelect={handleModeSelect} isHost />
+      </AppShell>
     </ProtectedRoute>
   );
 }

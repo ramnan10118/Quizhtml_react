@@ -2,8 +2,10 @@
 
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Card, CardContent, CardHeader, CardTitle, Input, Button } from '@/components/ui'
+import { ArrowRight, LogOut, Radio, Users } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, Input, Button, Label, cn } from '@/components/ui'
 import { Header } from '@/components/layout/Header';
+import { ConnectionStatus } from '@/components/layout/ConnectionStatus';
 import { QuestionDisplay } from '@/components/quiz/QuestionDisplay';
 import { BuzzerButton } from '@/components/quiz/BuzzerButton';
 import { BasicQuizInterface } from '@/components/quiz/BasicQuizInterface';
@@ -11,12 +13,12 @@ import { ScheduledQuizInterface } from '@/components/quiz/ScheduledQuizInterface
 import { useSocket } from '@/hooks/useSocket';
 import { useQuizState } from '@/hooks/useQuizState';
 import { useHapticFeedback } from '@/hooks/useHapticFeedback';
-import { QuizMode, QuizQuestion, QuizSettings, RevealState, LeaderboardEntry } from '@/types/quiz';
+import { QuizMode, QuizQuestion, PublicQuizQuestion, QuizSettings, RevealState, LeaderboardEntry } from '@/types/quiz';
 import confetti from 'canvas-confetti';
 
 export default function JoinPage() {
   const router = useRouter();
-  const { socket } = useSocket();
+  const { socket, connectionStatus } = useSocket();
   const {
     quizState,
     updateCurrentQuestion,
@@ -60,10 +62,10 @@ export default function JoinPage() {
     if (!socket) return;
 
     // Socket event listeners
-    socket.on('quiz-mode-set', (data: { mode: QuizMode; settings: QuizSettings; questions?: QuizQuestion[] }) => {
+    socket.on('quiz-mode-set', (data: { mode: QuizMode; settings: QuizSettings; questions?: PublicQuizQuestion[] }) => {
       setQuizMode(data.mode);
       setQuizSettings(data.settings || {});
-      const receivedQuestions = data.questions || [];
+      const receivedQuestions = (data.questions || []) as QuizQuestion[];
       setQuestions(receivedQuestions);
       
       // Initialize revealed questions state for scheduled mode
@@ -316,59 +318,73 @@ export default function JoinPage() {
     }
   };
 
+  // ---- Presentation-only derived values ----
+  const modeLabel = quizMode === 'buzzer' ? 'Buzzer' : quizMode === 'basic' ? 'Self-paced' : 'Scheduled';
+  const buzzerLayout = isRegistered && quizMode === 'buzzer';
+
   return (
-    <div className={`min-h-screen flex flex-col bg-gray-50 dark:bg-dark-900 dark ${isCelebrating ? 'celebrating' : ''}`}>
-      <Header 
-        title="Quiz Participant" 
-        subtitle={isMounted && teamName ? `Team: ${teamName}` : 'Join the Quiz'}
+    <div className={cn('app-bg flex min-h-screen flex-col', isCelebrating && 'celebrating')}>
+      <Header
+        title={`${modeLabel} quiz`}
+        subtitle={isMounted && teamName ? `Team ${teamName}` : 'Join the session'}
       >
+        <ConnectionStatus status={connectionStatus} compact />
         {isRegistered && teamName && (
-          <Button
-            onClick={handleExitQuiz}
-            variant="destructive"
-            size="sm"
-          >
-            Exit Quiz
+          <Button onClick={handleExitQuiz} variant="ghost" size="sm" aria-label="Exit quiz">
+            <LogOut /> <span className="hidden sm:inline">Exit</span>
           </Button>
         )}
       </Header>
-      
-      {/* Welcome Message */}
-      {isRegistered && teamName && (
-        <div className="bg-blue-600 text-white px-6 py-3 text-center">
-          <p className="text-sm font-medium">
-            Welcome, Team {teamName}! Click the buzzer when you know the answer.
-          </p>
-        </div>
-      )}
 
-      <main className="flex-1 flex flex-col items-center justify-center p-3 sm:p-6 pb-24 sm:pb-32 bg-gray-50 dark:bg-dark-900">
-        <div className="w-full max-w-lg space-y-4 sm:space-y-6">
+      <main
+        className={cn(
+          'flex flex-1 flex-col items-center px-4 py-5 sm:px-6 sm:py-8',
+          !isRegistered && 'justify-center',
+          buzzerLayout ? 'pb-[19rem]' : 'pb-10'
+        )}
+      >
+        <div className="w-full max-w-lg space-y-4">
           {!isRegistered ? (
             /* Registration Form */
-            <Card className="bg-white/10 dark:bg-dark-800/50 backdrop-blur border-white/20 dark:border-dark-600">
-              <CardHeader className="pb-4">
-                <CardTitle className="text-lg sm:text-xl text-gray-900 dark:text-gray-100 text-center">
-                  Join the {quizMode.charAt(0).toUpperCase() + quizMode.slice(1)} Quiz
-                </CardTitle>
+            <Card className="stage-bg animate-fade-up">
+              <CardHeader className="items-center text-center">
+                <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-xl bg-primary/15 text-primary">
+                  <Users className="h-6 w-6" />
+                </div>
+                <CardTitle className="text-xl sm:text-2xl">Join the {modeLabel.toLowerCase()} quiz</CardTitle>
+                <CardDescription>
+                  {quizMode === 'buzzer'
+                    ? 'Pick a team name. You will get a big buzzer once you are in.'
+                    : 'Enter your name to receive the questions on this device.'}
+                </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <Input
-                  type="text"
-                  placeholder="Enter your team name"
-                  value={inputName}
-                  onChange={(e) => setInputName(e.target.value)}
-                  onKeyPress={handleKeyPress}
-                  className="text-base sm:text-lg py-3 sm:py-4"
-                  autoFocus
-                />
+                <div className="space-y-2">
+                  <Label htmlFor="team-name">{quizMode === 'buzzer' ? 'Team name' : 'Your name'}</Label>
+                  <Input
+                    id="team-name"
+                    type="text"
+                    placeholder={quizMode === 'buzzer' ? 'e.g. The Night Owls' : 'e.g. Priya'}
+                    value={inputName}
+                    onChange={(e) => setInputName(e.target.value)}
+                    onKeyPress={handleKeyPress}
+                    className="h-12 text-lg"
+                    autoComplete="off"
+                    enterKeyHint="go"
+                    autoFocus
+                  />
+                </div>
                 <Button
                   onClick={handleRegisterTeam}
-                  className="w-full py-3 sm:py-4 text-base sm:text-lg"
+                  className="w-full"
+                  size="xl"
                   disabled={!inputName.trim()}
                 >
-                  Join Quiz
+                  Join quiz <ArrowRight />
                 </Button>
+                <p className="text-center text-xs text-muted-foreground">
+                  {connectionStatus.isConnected ? 'Connected to the session server.' : 'Connecting to the session server…'}
+                </p>
               </CardContent>
             </Card>
           ) : (
@@ -376,34 +392,45 @@ export default function JoinPage() {
             <>
               {quizMode === 'buzzer' && (
                 <>
+                  <div className="flex items-center justify-between gap-3 rounded-lg border border-border bg-card px-3 py-2 text-sm shadow-card">
+                    <span className="flex min-w-0 items-center gap-2">
+                      <span className="h-2 w-2 shrink-0 rounded-full bg-success animate-live-dot" />
+                      <span className="truncate">
+                        Playing as <span className="font-semibold text-foreground">{teamName}</span>
+                      </span>
+                    </span>
+                    <span className={cn('shrink-0 text-xs font-semibold', quizState.canBuzz ? 'text-success' : 'text-muted-foreground')}>
+                      {quizState.canBuzz ? 'Buzzer armed' : 'Buzzer locked'}
+                    </span>
+                  </div>
+
                   {quizState.currentQuestionData ? (
                     <QuestionDisplay
                       questionNumber={quizState.currentQuestion}
                       question={quizState.currentQuestionData}
                       isHost={false}
                       revealedAnswer={revealedAnswer}
-                      className="bg-white/10 dark:bg-dark-800/50 backdrop-blur border-white/20 dark:border-dark-600"
+                      className="animate-fade-up"
                     />
                   ) : (
-                    <Card className="bg-white/10 dark:bg-dark-800/50 backdrop-blur border-white/20 dark:border-dark-600">
-                      <CardContent className="p-8 text-center">
-                        <div className="space-y-4">
-                          <div className="text-lg font-medium text-gray-900 dark:text-gray-100">
-                            Ready to Play! 🎯
-                          </div>
-                          <div className="text-gray-600 dark:text-gray-400">
-                            Waiting for the host to start the first question...
-                          </div>
-                          <div className="text-sm text-gray-500 dark:text-gray-500">
-                            Get ready to buzz in when you know the answer!
-                          </div>
-                        </div>
+                    <Card className="stage-bg animate-fade-up">
+                      <CardContent className="flex flex-col items-center p-8 text-center">
+                        <span className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary/15 text-primary">
+                          <Radio className="h-6 w-6 animate-pulse-slow" />
+                        </span>
+                        <p className="font-display text-lg font-semibold text-foreground">You&apos;re in</p>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                          Waiting for the host to start the first question.
+                        </p>
+                        <p className="mt-3 text-xs text-muted-foreground">
+                          Keep this screen open and get ready to buzz.
+                        </p>
                       </CardContent>
                     </Card>
                   )}
                 </>
               )}
-              
+
               {quizMode === 'basic' && (
                 <BasicQuizInterface
                   questions={questions}

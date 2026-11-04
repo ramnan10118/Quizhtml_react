@@ -1,5 +1,6 @@
 import * as React from 'react'
-import { Card, CardContent, CardHeader, CardTitle, Button, Badge, cn } from '@/components/ui'
+import { Check, CheckCircle2, Clock, Copy, Gauge, Link2, ListChecks, RefreshCw, SlidersHorizontal, Trophy } from 'lucide-react'
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, Button, Badge, Input, Label, StatTile, cn } from '@/components/ui'
 import { ParticipantSubmission, QuizSettings } from '@/types/quiz'
 
 const { useState } = React
@@ -21,119 +22,84 @@ export function BasicQuizHostControls({
   onRefreshData,
   className
 }: BasicQuizHostControlsProps) {
+  const [copied, setCopied] = useState(false)
   const completedSubmissions = submissions.filter(s => s.isComplete)
   const inProgressCount = participantCount - completedSubmissions.length
-  
-  const averageScore = completedSubmissions.length > 0 
+
+  const averageScore = completedSubmissions.length > 0
     ? Math.round(completedSubmissions.reduce((sum, s) => sum + (s.score || 0), 0) / completedSubmissions.length)
     : 0
 
-  const passedCount = settings.passingScore 
+  const passedCount = settings.passingScore
     ? completedSubmissions.filter(s => ((s.score || 0) / submissions[0]?.answers.length || 1) * 100 >= settings.passingScore!).length
     : 0
 
+  const joinLink = typeof window !== 'undefined' ? window.location.href.replace('/host', '/join') : ''
+
   return (
-    <div className={cn('space-y-6', className)}>
+    <div className={cn('space-y-5', className)}>
       {/* Quick Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="p-4 text-center">
-            <div className="text-2xl font-bold text-primary">
-              {completedSubmissions.length}
-            </div>
-            <div className="text-sm text-muted-foreground">Completed</div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardContent className="p-4 text-center">
-            <div className="text-2xl font-bold text-yellow-600">
-              {inProgressCount}
-            </div>
-            <div className="text-sm text-muted-foreground">In Progress</div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardContent className="p-4 text-center">
-            <div className="text-2xl font-bold text-green-600">
-              {averageScore}%
-            </div>
-            <div className="text-sm text-muted-foreground">Avg Score</div>
-          </CardContent>
-        </Card>
-        
-        {settings.passingScore && (
-          <Card>
-            <CardContent className="p-4 text-center">
-              <div className="text-2xl font-bold text-blue-600">
-                {passedCount}
-              </div>
-              <div className="text-sm text-muted-foreground">Passed</div>
-            </CardContent>
-          </Card>
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+        <StatTile label="Completed" value={completedSubmissions.length} tone="primary" icon={<CheckCircle2 />} />
+        <StatTile label="In progress" value={inProgressCount} tone="warning" icon={<Clock />} />
+        <StatTile label="Avg score" value={`${averageScore}%`} tone="success" icon={<Gauge />} />
+        {settings.passingScore ? (
+          <StatTile label="Passed" value={passedCount} tone="info" icon={<Trophy />} hint={`${settings.passingScore}% to pass`} />
+        ) : (
+          <StatTile label="Participants" value={participantCount} icon={<ListChecks />} />
         )}
       </div>
 
       {/* Controls */}
       <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle className="flex items-center space-x-2">
-              <span>🎛️</span>
-              <span>Quiz Controls</span>
+        <CardHeader className="flex-row items-start justify-between gap-3 space-y-0">
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              <SlidersHorizontal className="h-4 w-4 text-primary" /> Quiz controls
             </CardTitle>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={onRefreshData}
-            >
-              🔄 Refresh
-            </Button>
+            <CardDescription>Live status and rules for this self-paced quiz</CardDescription>
           </div>
+          <Button variant="outline" size="sm" onClick={onRefreshData}>
+            <RefreshCw /> Refresh
+          </Button>
         </CardHeader>
-        
-        <CardContent className="space-y-4">
+
+        <CardContent className="space-y-5">
           {/* Real-time Status */}
-          <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
+          <div className="flex items-center justify-between gap-3 rounded-lg border border-border bg-surface-raised p-4">
             <div>
-              <div className="font-medium">Quiz Status</div>
-              <div className="text-sm text-muted-foreground">
-                {inProgressCount > 0 
-                  ? `${inProgressCount} participants still taking the quiz`
+              <p className="text-sm font-semibold text-foreground">Quiz status</p>
+              <p className="text-sm text-muted-foreground">
+                {inProgressCount > 0
+                  ? `${inProgressCount} participant${inProgressCount === 1 ? '' : 's'} still taking the quiz`
                   : 'All participants have completed the quiz'
                 }
-              </div>
+              </p>
             </div>
-            <div className="flex items-center space-x-2">
-              <div className={cn(
-                "w-2 h-2 rounded-full",
-                inProgressCount > 0 ? "bg-yellow-500" : "bg-green-500"
-              )} />
-              <span className="text-sm font-medium">
-                {inProgressCount > 0 ? 'Active' : 'Complete'}
-              </span>
-            </div>
+            <Badge variant={inProgressCount > 0 ? 'warning' : 'success'}>
+              {inProgressCount > 0 ? 'Active' : 'Complete'}
+            </Badge>
           </div>
 
           {/* Settings Panel */}
-          <div className="space-y-3">
-            <h4 className="font-medium">Quiz Settings</h4>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-4">
+            <h4 className="eyebrow">Rules</h4>
+
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               {/* Time Limit */}
               <div className="space-y-2">
-                <label className="text-sm font-medium">Time Limit (minutes)</label>
-                <div className="flex items-center space-x-2">
-                  <input
+                <Label htmlFor="basic-time-limit">Time limit (minutes)</Label>
+                <div className="flex items-center gap-3">
+                  <Input
+                    id="basic-time-limit"
                     type="number"
                     min="1"
                     max="120"
                     value={settings.timeLimit ? Math.floor(settings.timeLimit / 60) : 0}
-                    onChange={(e) => onSettingsUpdate({ 
-                      timeLimit: parseInt(e.target.value) * 60 
+                    onChange={(e) => onSettingsUpdate({
+                      timeLimit: parseInt(e.target.value) * 60
                     })}
-                    className="w-20 px-2 py-1 text-sm border rounded"
+                    className="w-24"
                   />
                   <span className="text-sm text-muted-foreground">
                     {settings.timeLimit ? `${Math.floor(settings.timeLimit / 60)} min` : 'No limit'}
@@ -143,17 +109,18 @@ export function BasicQuizHostControls({
 
               {/* Passing Score */}
               <div className="space-y-2">
-                <label className="text-sm font-medium">Passing Score (%)</label>
-                <div className="flex items-center space-x-2">
-                  <input
+                <Label htmlFor="basic-passing-score">Passing score (%)</Label>
+                <div className="flex items-center gap-3">
+                  <Input
+                    id="basic-passing-score"
                     type="number"
                     min="0"
                     max="100"
                     value={settings.passingScore || 0}
-                    onChange={(e) => onSettingsUpdate({ 
-                      passingScore: parseInt(e.target.value) || undefined 
+                    onChange={(e) => onSettingsUpdate({
+                      passingScore: parseInt(e.target.value) || undefined
                     })}
-                    className="w-20 px-2 py-1 text-sm border rounded"
+                    className="w-24"
                   />
                   <span className="text-sm text-muted-foreground">%</span>
                 </div>
@@ -161,25 +128,23 @@ export function BasicQuizHostControls({
             </div>
 
             {/* Toggles */}
-            <div className="space-y-2">
-              <label className="flex items-center space-x-2">
+            <div className="grid gap-2 sm:grid-cols-2">
+              <label className="flex min-h-11 cursor-pointer items-center gap-3 rounded-lg border border-border px-3 py-2 text-sm hover:bg-accent/50">
                 <input
                   type="checkbox"
                   checked={settings.allowRetakes || false}
                   onChange={(e) => onSettingsUpdate({ allowRetakes: e.target.checked })}
-                  className="rounded"
                 />
-                <span className="text-sm">Allow retakes</span>
+                <span>Allow retakes</span>
               </label>
-              
-              <label className="flex items-center space-x-2">
+
+              <label className="flex min-h-11 cursor-pointer items-center gap-3 rounded-lg border border-border px-3 py-2 text-sm hover:bg-accent/50">
                 <input
                   type="checkbox"
                   checked={settings.showCorrectAnswers !== false}
                   onChange={(e) => onSettingsUpdate({ showCorrectAnswers: e.target.checked })}
-                  className="rounded"
                 />
-                <span className="text-sm">Show correct answers in results</span>
+                <span>Show correct answers in results</span>
               </label>
             </div>
           </div>
@@ -189,15 +154,14 @@ export function BasicQuizHostControls({
       {/* Recent Completions */}
       {completedSubmissions.length > 0 && (
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
-              <span>📋</span>
-              <span>Recent Completions</span>
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2">
+              <CheckCircle2 className="h-4 w-4 text-success" /> Recent completions
             </CardTitle>
           </CardHeader>
-          
+
           <CardContent>
-            <div className="space-y-2">
+            <ul className="divide-y divide-border">
               {completedSubmissions
                 .sort((a, b) => b.submissionTime - a.submissionTime)
                 .slice(0, 5)
@@ -208,41 +172,34 @@ export function BasicQuizHostControls({
                   const isPassed = settings.passingScore ? percentage >= settings.passingScore : true
 
                   return (
-                    <div
-                      key={index}
-                      className="flex items-center justify-between p-3 bg-muted/30 rounded-lg"
-                    >
-                      <div className="flex items-center space-x-3">
+                    <li key={index} className="flex items-center justify-between gap-3 py-3 first:pt-0 last:pb-0">
+                      <div className="flex min-w-0 items-center gap-3">
                         <div className={cn(
-                          "w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold",
-                          isPassed 
-                            ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
-                            : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
+                          'flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold',
+                          isPassed ? 'bg-success/15 text-success' : 'bg-destructive/15 text-destructive'
                         )}>
-                          {isPassed ? '✓' : '✗'}
+                          {isPassed ? <Check className="h-4 w-4" /> : '✕'}
                         </div>
-                        <div>
-                          <div className="font-medium">{submission.participantName}</div>
-                          <div className="text-xs text-muted-foreground">
+                        <div className="min-w-0">
+                          <div className="truncate text-sm font-semibold text-foreground">{submission.participantName}</div>
+                          <div className="text-xs text-muted-foreground tabular">
                             {new Date(submission.submissionTime).toLocaleString()}
                           </div>
                         </div>
                       </div>
                       <div className="text-right">
-                        <div className="font-semibold">{score}/{totalQuestions}</div>
-                        <div className="text-xs text-muted-foreground">{percentage}%</div>
+                        <div className="font-display text-base font-bold tabular text-foreground">{score}/{totalQuestions}</div>
+                        <div className="text-[11px] text-muted-foreground tabular">{percentage}%</div>
                       </div>
-                    </div>
+                    </li>
                   )
                 })}
-            </div>
-            
+            </ul>
+
             {completedSubmissions.length > 5 && (
-              <div className="text-center mt-3">
-                <p className="text-sm text-muted-foreground">
-                  And {completedSubmissions.length - 5} more submissions...
-                </p>
-              </div>
+              <p className="mt-3 text-center text-xs text-muted-foreground">
+                And {completedSubmissions.length - 5} more submissions
+              </p>
             )}
           </CardContent>
         </Card>
@@ -250,34 +207,36 @@ export function BasicQuizHostControls({
 
       {/* Share Controls */}
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <span>🔗</span>
-            <span>Share Quiz</span>
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2">
+            <Link2 className="h-4 w-4 text-primary" /> Share quiz
           </CardTitle>
+          <CardDescription>Participants open this link to take the quiz.</CardDescription>
         </CardHeader>
-        
-        <CardContent className="space-y-3">
-          <div className="flex items-center space-x-2">
+
+        <CardContent>
+          <div className="flex items-center gap-2">
             <input
               type="text"
               value={window.location.href.replace('/host', '/join')}
               readOnly
-              className="flex-1 px-3 py-2 text-sm border rounded bg-muted"
+              aria-label="Join link"
+              className="h-10 min-w-0 flex-1 rounded-md border border-input bg-surface-raised px-3 font-mono text-xs text-foreground focus-ring"
             />
             <Button
               size="sm"
+              variant={copied ? 'success' : 'default'}
               onClick={() => {
                 navigator.clipboard.writeText(window.location.href.replace('/host', '/join'))
+                setCopied(true)
+                setTimeout(() => setCopied(false), 2000)
               }}
             >
-              Copy Link
+              {copied ? <Check /> : <Copy />}
+              {copied ? 'Copied' : 'Copy link'}
             </Button>
           </div>
-          
-          <div className="text-sm text-muted-foreground">
-            Share this link with participants to join the quiz
-          </div>
+          {!joinLink && <span className="sr-only">Join link unavailable</span>}
         </CardContent>
       </Card>
     </div>

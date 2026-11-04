@@ -2,41 +2,54 @@
 
 import React, { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Header } from '@/components/layout/Header'
-import { Card, CardContent, CardHeader, CardTitle, Button, Input } from '@/components/ui'
+import Link from 'next/link';
+import { AlertTriangle, ArrowLeftRight, Check, CheckCircle2, GripVertical, ListChecks, Pencil, Plus, Rocket, Save, Sparkles, Trash2, Wand2, X } from 'lucide-react';
+import { AppShell } from '@/components/layout/AppShell'
+import {
+  Card, CardContent, CardHeader, CardTitle, CardDescription, Button, Input, Textarea, NativeSelect, Label, Badge,
+  SegmentedControl, EmptyState, Spinner, LoadingScreen, Alert, AlertDescription,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
+} from '@/components/ui'
+import { AnswerOption } from '@/components/quiz/AnswerOption';
 import { QuizQuestion, QuizSettings } from '@/types/quiz';
 import { quizDrafts, liveQuizzes } from '@/lib/drafts';
 import { useAuth } from '@/contexts/AuthContext';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
+import { cn, getOptionLabel } from '@/lib/utils';
 
+const MODE_LABELS: Record<'buzzer' | 'basic' | 'scheduled', string> = {
+  buzzer: 'Buzzer',
+  basic: 'Self-paced',
+  scheduled: 'Scheduled reveal',
+};
 
 function QuizSetupContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user } = useAuth();
-  
+
   const [questions, setQuestions] = useState<QuizQuestion[]>([]);
   const [currentDraft, setCurrentDraft] = useState<string | null>(null);
   const [loadingDraft, setLoadingDraft] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
   const [activeTab, setActiveTab] = useState<'manual' | 'ai'>('ai');
   const [errorMessage, setErrorMessage] = useState<string>('');
-  
+
   // Quiz mode state
   const [selectedMode, setSelectedMode] = useState<'buzzer' | 'basic' | 'scheduled'>('buzzer');
   const [modeSettings, setModeSettings] = useState<QuizSettings | null>(null);
-  
+
   // Save draft modal state
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [draftName, setDraftName] = useState('');
   const [saving, setSaving] = useState(false);
-  
+
   // AI Generation State
   const [topic, setTopic] = useState('');
   const [difficulty, setDifficulty] = useState<'Easy' | 'Medium' | 'Hard'>('Medium');
   const [questionCount, setQuestionCount] = useState(5);
   const [isGenerating, setIsGenerating] = useState(false);
-  
+
   // Manual Entry State
   const [manualQuestion, setManualQuestion] = useState<QuizQuestion>({
     text: '',
@@ -48,7 +61,7 @@ function QuizSetupContent() {
     original: QuizQuestion;
     enhanced: QuizQuestion;
   } | null>(null);
-  
+
   // Question Management State
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [reorderingIndex, setReorderingIndex] = useState<number | null>(null);
@@ -63,23 +76,23 @@ function QuizSetupContent() {
   useEffect(() => {
     const loadData = async () => {
       const draftId = searchParams.get('draft');
-      
+
       // Load selected mode and settings from sessionStorage
       try {
         const savedMode = sessionStorage.getItem('selectedQuizMode');
         const savedSettings = sessionStorage.getItem('selectedQuizSettings');
-        
+
         if (savedMode) {
           setSelectedMode(savedMode as 'buzzer' | 'basic' | 'scheduled');
         }
-        
+
         if (savedSettings) {
           setModeSettings(JSON.parse(savedSettings));
         }
       } catch (error) {
         console.error('Error loading mode from sessionStorage:', error);
       }
-      
+
       // First try to load from sessionStorage (for refresh persistence)
       try {
         const savedQuestions = sessionStorage.getItem('currentQuestions');
@@ -95,7 +108,7 @@ function QuizSetupContent() {
       } catch (error) {
         console.error('Error loading from sessionStorage:', error);
       }
-      
+
       if (draftId && user) {
         // Load from draft if no saved questions
         setLoadingDraft(true);
@@ -117,10 +130,10 @@ function QuizSetupContent() {
         // Start with empty questions for new quiz
         setQuestions([]);
       }
-      
+
       setIsLoaded(true);
     };
-    
+
     loadData();
   }, [searchParams, user]);
 
@@ -157,7 +170,7 @@ function QuizSetupContent() {
       }
 
       const data = await response.json();
-      
+
       if (data.success && data.questions) {
         setQuestions([...data.questions, ...questions]);
         setTopic('');
@@ -264,7 +277,7 @@ function QuizSetupContent() {
 
   const handleStartReordering = (index: number) => {
     if (isAnimating) return; // Prevent reordering during animation
-    
+
     if (reorderingIndex === null) {
       setReorderingIndex(index);
     } else if (reorderingIndex === index) {
@@ -273,7 +286,7 @@ function QuizSetupContent() {
     } else {
       // Start animation
       setIsAnimating(true);
-      
+
       // Add a brief delay to show the animation effect
       setTimeout(() => {
         // Move question from reorderingIndex to index position
@@ -282,7 +295,7 @@ function QuizSetupContent() {
         newQuestions.splice(index, 0, questionToMove);
         setQuestions(newQuestions);
         setReorderingIndex(null);
-        
+
         // End animation after the move
         setTimeout(() => {
           setIsAnimating(false);
@@ -352,7 +365,7 @@ function QuizSetupContent() {
         title: draftName.trim(),
         questions: questions
       });
-      
+
       setShowSaveModal(false);
       setDraftName('');
       setErrorMessage('Draft saved successfully!');
@@ -372,166 +385,130 @@ function QuizSetupContent() {
     setShowSaveModal(true);
   };
 
-  const isValidQuiz = questions.length >= 3 && questions.every(q => 
+  const isValidQuiz = questions.length >= 3 && questions.every(q =>
     q.text.trim() !== '' && q.options.every(opt => opt.trim() !== '')
   );
 
+  // ---- Presentation-only helpers ----
+  const closeSaveModal = () => {
+    setShowSaveModal(false);
+    setDraftName('');
+    setErrorMessage('');
+  };
+  const isSuccessMessage = errorMessage.includes('successfully');
+  const manualReady = Boolean(manualQuestion.text.trim()) && manualQuestion.options.every(opt => opt.trim());
+
   return (
     <ProtectedRoute>
-      <div className="min-h-screen bg-gray-50 dark:bg-dark-900 dark">
-      <Header 
-        title={currentDraft ? "Edit Quiz Draft" : `Create ${selectedMode.charAt(0).toUpperCase() + selectedMode.slice(1)} Quiz`} 
-        subtitle={`${questions.length} question${questions.length !== 1 ? 's' : ''} ready`}
-      />
-      
-      <main className="max-w-6xl mx-auto p-6">
-        {/* Header Card */}
-        <Card className="mb-6">
-          <CardHeader>
-            <div className="flex items-start justify-between">
-              <div>
-                <CardTitle className="text-gray-900 dark:text-gray-100 mb-2">
-                  {loadingDraft ? 'Loading Draft...' : currentDraft ? 'Edit Quiz Draft' : 'Questionnaire Creator'}
-                </CardTitle>
-                <p className="text-gray-600 dark:text-gray-400">
-                  Create questions using AI generation or manual entry. Enhance and manage your questions.
-                </p>
-              </div>
-              <div className="flex flex-col items-end space-y-2">
-                <div className="flex flex-wrap gap-2 justify-end">
-                  {user && (
-                    <Button 
-                      onClick={handleOpenSaveModal}
-                      disabled={questions.length === 0}
-                      variant="outline"
-                    >
-                      💾 Save as Draft
-                    </Button>
-                  )}
-                  <Button 
-                    onClick={handleLaunchQuiz}
-                    disabled={!isValidQuiz}
-                    className="bg-green-600 hover:bg-green-700"
-                  >
-                    🚀 Launch Quiz
-                  </Button>
-                </div>
-                {!isValidQuiz && (
-                  <p className="text-xs text-red-600 dark:text-red-400 font-medium">
-                    Need at least 3 complete questions
-                  </p>
-                )}
-              </div>
-            </div>
-          </CardHeader>
-        </Card>
-
-        {errorMessage && (
-          <div className={`mb-4 p-3 rounded-lg text-sm ${
-            errorMessage.includes('successfully') 
-              ? 'bg-green-100 border border-green-300 text-green-700'
-              : 'bg-red-100 border border-red-300 text-red-700'
-          }`}>
-            {errorMessage}
+      <AppShell
+        backHref="/dashboard"
+        backLabel="Dashboard"
+        eyebrow={currentDraft ? 'Edit draft' : 'New quiz'}
+        title={loadingDraft ? 'Loading draft…' : currentDraft ? 'Edit quiz draft' : 'Build your quiz'}
+        subtitle="Generate questions with AI or write them by hand, then launch."
+        headingActions={
+          <div className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 shadow-card">
+            <span className="eyebrow">Mode</span>
+            <Badge variant="default">{MODE_LABELS[selectedMode]}</Badge>
+            <Link href="/quiz" className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground focus-ring rounded">
+              <ArrowLeftRight className="h-3.5 w-3.5" /> Change
+            </Link>
           </div>
+        }
+        mainClassName="pb-28"
+      >
+        {errorMessage && (
+          <Alert variant={isSuccessMessage ? 'success' : 'destructive'} className="mb-5 animate-fade-up">
+            {isSuccessMessage ? <CheckCircle2 /> : <AlertTriangle />}
+            <AlertDescription>{errorMessage}</AlertDescription>
+          </Alert>
         )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
           {/* Left Panel - Creation Methods */}
-          <div className="lg:col-span-1 space-y-6">
-            {/* Tab Navigation */}
-            <div className="flex bg-gray-100 dark:bg-dark-700 rounded-lg p-1">
-              <button
-                onClick={() => setActiveTab('ai')}
-                className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
-                  activeTab === 'ai'
-                    ? 'bg-white dark:bg-dark-600 text-gray-900 dark:text-gray-100 shadow-sm'
-                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100'
-                }`}
-              >
-                🤖 AI Generation
-              </button>
-              <button
-                onClick={() => setActiveTab('manual')}
-                className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
-                  activeTab === 'manual'
-                    ? 'bg-white dark:bg-dark-600 text-gray-900 dark:text-gray-100 shadow-sm'
-                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100'
-                }`}
-              >
-                📝 Manual Entry
-              </button>
-            </div>
+          <div className="space-y-4 lg:col-span-5 xl:col-span-4">
+            <SegmentedControl<'ai' | 'manual'>
+              value={activeTab}
+              onChange={setActiveTab}
+              aria-label="Question source"
+              options={[
+                { value: 'ai', label: 'Generate with AI', icon: <Sparkles /> },
+                { value: 'manual', label: 'Write manually', icon: <Pencil /> },
+              ]}
+            />
 
             {/* AI Generation Panel */}
             {activeTab === 'ai' && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg dark:text-gray-100">AI Question Generator</CardTitle>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
-                    Generate questions automatically using AI
-                  </p>
+              <Card className="animate-fade-in">
+                <CardHeader className="pb-4">
+                  <CardTitle className="flex items-center gap-2">
+                    <Sparkles className="h-4 w-4 text-primary" /> AI question generator
+                  </CardTitle>
+                  <CardDescription>Describe a topic and we will draft multiple-choice questions for you.</CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-6">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Topic or Subject
-                    </label>
+                <CardContent className="space-y-5">
+                  <div className="space-y-2">
+                    <Label htmlFor="ai-topic">Topic or subject</Label>
                     <Input
+                      id="ai-topic"
                       value={topic}
                       onChange={(e) => setTopic(e.target.value)}
-                      placeholder="e.g., World War II, JavaScript, Biology"
+                      placeholder="e.g. World War II, JavaScript, Biology"
                       disabled={isGenerating}
                     />
-                    <div className="mt-3">
-                      <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">Quick suggestions:</p>
-                      <div className="flex flex-wrap gap-1">
-                        {topicSuggestions.map((suggestion) => (
-                          <button
-                            key={suggestion}
-                            onClick={() => setTopic(suggestion)}
-                            className="px-2 py-1 text-xs bg-gray-100 dark:bg-dark-600 hover:bg-gray-200 dark:hover:bg-dark-500 rounded text-gray-700 dark:text-gray-300"
-                            disabled={isGenerating}
-                          >
-                            {suggestion}
-                          </button>
-                        ))}
-                      </div>
+                    <div className="flex flex-wrap gap-1.5 pt-1">
+                      {topicSuggestions.map((suggestion) => (
+                        <button
+                          key={suggestion}
+                          type="button"
+                          onClick={() => setTopic(suggestion)}
+                          disabled={isGenerating}
+                          className={cn(
+                            'h-8 rounded-full border px-3 text-xs font-medium transition-colors focus-ring',
+                            topic === suggestion
+                              ? 'border-primary bg-primary/10 text-foreground'
+                              : 'border-border bg-surface-raised text-muted-foreground hover:border-muted-foreground/50 hover:text-foreground'
+                          )}
+                        >
+                          {suggestion}
+                        </button>
+                      ))}
                     </div>
                   </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Difficulty Level
-                    </label>
-                    <select
-                      value={difficulty}
-                      onChange={(e) => setDifficulty(e.target.value as 'Easy' | 'Medium' | 'Hard')}
-                      className="w-full p-2 pr-8 border border-gray-300 dark:border-dark-600 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white dark:bg-dark-700 text-gray-900 dark:text-gray-100"
-                      disabled={isGenerating}
-                    >
-                      <option value="Easy">Easy</option>
-                      <option value="Medium">Medium</option>
-                      <option value="Hard">Hard</option>
-                    </select>
-                  </div>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="ai-difficulty">Difficulty</Label>
+                      <NativeSelect
+                        id="ai-difficulty"
+                        value={difficulty}
+                        onChange={(e) => setDifficulty(e.target.value as 'Easy' | 'Medium' | 'Hard')}
+                        disabled={isGenerating}
+                      >
+                        <option value="Easy">Easy</option>
+                        <option value="Medium">Medium</option>
+                        <option value="Hard">Hard</option>
+                      </NativeSelect>
+                    </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Number of Questions ({questionCount})
-                    </label>
-                    <input
-                      type="range"
-                      min="1"
-                      max="20"
-                      value={questionCount}
-                      onChange={(e) => setQuestionCount(parseInt(e.target.value))}
-                      className="w-full"
-                      disabled={isGenerating}
-                    />
-                    <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-1">
-                      <span>1</span>
-                      <span>20</span>
+                    <div className="space-y-2">
+                      <Label htmlFor="ai-count">
+                        Questions <span className="ml-1 rounded bg-muted px-1.5 py-0.5 text-xs text-foreground tabular">{questionCount}</span>
+                      </Label>
+                      <input
+                        id="ai-count"
+                        type="range"
+                        min="1"
+                        max="20"
+                        value={questionCount}
+                        onChange={(e) => setQuestionCount(parseInt(e.target.value))}
+                        disabled={isGenerating}
+                        className="mt-3"
+                      />
+                      <div className="flex justify-between text-[11px] text-muted-foreground tabular">
+                        <span>1</span>
+                        <span>20</span>
+                      </div>
                     </div>
                   </div>
 
@@ -539,14 +516,16 @@ function QuizSetupContent() {
                     onClick={handleAIGenerate}
                     disabled={isGenerating || !topic.trim()}
                     className="w-full"
+                    size="lg"
                   >
                     {isGenerating ? (
-                      <span className="flex items-center space-x-2">
-                        <span className="animate-spin">🔄</span>
-                        <span>Generating...</span>
-                      </span>
+                      <>
+                        <Spinner size="sm" /> Generating…
+                      </>
                     ) : (
-                      `Generate ${questionCount} Questions`
+                      <>
+                        <Wand2 /> Generate {questionCount} question{questionCount === 1 ? '' : 's'}
+                      </>
                     )}
                   </Button>
                 </CardContent>
@@ -555,147 +534,128 @@ function QuizSetupContent() {
 
             {/* Manual Entry Panel */}
             {activeTab === 'manual' && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg dark:text-gray-100">Manual Question Entry</CardTitle>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
-                    Create custom questions manually
-                  </p>
+              <Card className="animate-fade-in">
+                <CardHeader className="pb-4">
+                  <CardTitle className="flex items-center gap-2">
+                    <Pencil className="h-4 w-4 text-primary" /> Write a question
+                  </CardTitle>
+                  <CardDescription>Four options; pick the correct one with the radio button.</CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Question Text
-                    </label>
-                    <textarea
+                <CardContent className="space-y-5">
+                  <div className="space-y-2">
+                    <Label htmlFor="manual-question">Question</Label>
+                    <Textarea
+                      id="manual-question"
                       value={manualQuestion.text}
                       onChange={(e) => setManualQuestion({ ...manualQuestion, text: e.target.value })}
                       placeholder="Enter your question..."
-                      className="w-full p-3 border border-gray-300 dark:border-dark-600 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white dark:bg-dark-700 text-gray-900 dark:text-gray-100 resize-none"
                       rows={3}
                     />
                   </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Answer Options
-                    </label>
-                    <div className="space-y-2">
-                      {manualQuestion.options.map((option, index) => (
-                        <div key={index} className="flex items-center space-x-2">
-                          <input
-                            type="radio"
-                            name="correct-manual"
-                            checked={manualQuestion.correct === index}
-                            onChange={() => setManualQuestion({ ...manualQuestion, correct: index })}
-                            className="text-green-600"
-                          />
-                          <span className="w-6 text-sm font-medium text-gray-600 dark:text-gray-400">
-                            {String.fromCharCode(65 + index)}:
-                          </span>
-                          <Input
-                            value={option}
-                            onChange={(e) => {
-                              const updatedOptions = [...manualQuestion.options];
-                              updatedOptions[index] = e.target.value;
-                              setManualQuestion({ ...manualQuestion, options: updatedOptions });
-                            }}
-                            placeholder={`Option ${String.fromCharCode(65 + index)}`}
-                            className="flex-1"
-                          />
-                        </div>
-                      ))}
+                  <fieldset className="space-y-2">
+                    <legend className="text-sm font-medium leading-none">Answer options</legend>
+                    <div className="space-y-2 pt-1">
+                      {manualQuestion.options.map((option, index) => {
+                        const isCorrect = manualQuestion.correct === index
+                        return (
+                          <div
+                            key={index}
+                            className={cn(
+                              'flex items-center gap-2 rounded-lg border p-1.5 pl-3 transition-colors',
+                              isCorrect ? 'border-success/50 bg-success/5' : 'border-transparent'
+                            )}
+                          >
+                            <input
+                              type="radio"
+                              name="correct-manual"
+                              aria-label={`Mark option ${getOptionLabel(index)} as correct`}
+                              checked={isCorrect}
+                              onChange={() => setManualQuestion({ ...manualQuestion, correct: index })}
+                            />
+                            <span className={cn('w-5 text-sm font-bold', isCorrect ? 'text-success' : 'text-muted-foreground')}>
+                              {getOptionLabel(index)}
+                            </span>
+                            <Input
+                              value={option}
+                              onChange={(e) => {
+                                const updatedOptions = [...manualQuestion.options];
+                                updatedOptions[index] = e.target.value;
+                                setManualQuestion({ ...manualQuestion, options: updatedOptions });
+                              }}
+                              placeholder={`Option ${getOptionLabel(index)}`}
+                              className="h-10 flex-1"
+                              aria-label={`Option ${getOptionLabel(index)}`}
+                            />
+                          </div>
+                        )
+                      })}
                     </div>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-                      Select the correct answer using the radio buttons
+                    <p className="text-xs text-muted-foreground">
+                      The highlighted row is the correct answer.
                     </p>
-                  </div>
+                  </fieldset>
 
-                  <div className="flex space-x-3 pt-4">
+                  <div className="grid grid-cols-2 gap-2 pt-1">
                     <Button
                       onClick={handleEnhanceManualQuestion}
                       disabled={!manualQuestion.text.trim() || !manualQuestion.options.every(opt => opt.trim()) || isEnhancingManual}
                       variant="outline"
-                      className="flex-1 text-sm px-3 py-2"
-                      size="sm"
                     >
-                      {isEnhancingManual ? (
-                        <span className="flex items-center space-x-1">
-                          <span className="animate-spin text-xs">🔄</span>
-                          <span>Enhancing...</span>
-                        </span>
-                      ) : (
-                        <span className="flex items-center space-x-1">
-                          <span>✨</span>
-                          <span>Enhance</span>
-                        </span>
-                      )}
+                      {isEnhancingManual ? <Spinner size="sm" /> : <Sparkles />}
+                      {isEnhancingManual ? 'Enhancing…' : 'Enhance'}
                     </Button>
                     <Button
                       onClick={handleAddManualQuestion}
                       disabled={!manualQuestion.text.trim() || !manualQuestion.options.every(opt => opt.trim())}
-                      className="flex-1 text-sm px-3 py-2"
-                      size="sm"
                     >
-                      <span className="flex items-center space-x-1">
-                        <span>➕</span>
-                        <span>Add Question</span>
-                      </span>
+                      <Plus /> Add question
                     </Button>
                   </div>
+                  {!manualReady && (
+                    <p className="text-xs text-muted-foreground">Fill in the question and all four options to enable these actions.</p>
+                  )}
                 </CardContent>
               </Card>
             )}
           </div>
 
           {/* Right Panel - Question Management */}
-          <div className="lg:col-span-2">
+          <div className="lg:col-span-7 xl:col-span-8">
             <Card>
-              <CardHeader>
-                <div className="flex items-start justify-between">
-                  <div>
-                    <CardTitle className="text-lg dark:text-gray-100">Question Management</CardTitle>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
-                      <span className="font-medium">{questions.length}</span> questions ready
-                    </p>
-                  </div>
-                  <div className="flex items-center space-x-4">
-                    {questions.length > 0 && (
-                      <Button
-                        onClick={handleDeleteAllQuestions}
-                        variant="destructive"
-                        size="sm"
-                        className="text-xs"
-                      >
-                        🗑️ Delete All
-                      </Button>
-                    )}
-                  </div>
+              <CardHeader className="flex-row items-start justify-between gap-3 space-y-0 pb-4">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <ListChecks className="h-4 w-4 text-primary" /> Questions
+                    <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-semibold text-muted-foreground tabular">{questions.length}</span>
+                  </CardTitle>
+                  <CardDescription>
+                    {reorderingIndex !== null
+                      ? 'Reordering: click another number to move the selected question there.'
+                      : 'Click a number to reorder. Newest questions appear first.'}
+                  </CardDescription>
                 </div>
+                {questions.length > 0 && (
+                  <Button onClick={handleDeleteAllQuestions} variant="ghost" size="sm" className="text-muted-foreground hover:text-destructive">
+                    <Trash2 /> Clear all
+                  </Button>
+                )}
               </CardHeader>
               <CardContent>
                 {questions.length === 0 ? (
-                  <div className="text-center py-16">
-                    <div className="mb-6">
-                      <div className="w-16 h-16 bg-gray-100 dark:bg-dark-600 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <span className="text-2xl">📝</span>
-                      </div>
-                      <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
-                        No questions yet
-                      </h3>
-                      <p className="text-gray-500 dark:text-gray-400 mb-6 max-w-sm mx-auto">
-                        Get started by creating questions using AI generation or manual entry from the panel on the left.
-                      </p>
-                    </div>
-                  </div>
+                  <EmptyState
+                    icon={<ListChecks />}
+                    title="No questions yet"
+                    description="Generate a set with AI or write your first question in the panel on the left. You need at least three to launch."
+                  />
                 ) : (
-                  <div className="space-y-4">
+                  <div className="space-y-3">
                     {questions.map((question, index) => (
                       <div
                         key={`question-${question.text.slice(0, 20)}-${index}`}
                         className={`transform transition-all duration-500 ease-in-out ${
-                          isAnimating && reorderingIndex === index 
-                            ? 'scale-105 opacity-75' 
+                          isAnimating && reorderingIndex === index
+                            ? 'scale-105 opacity-75'
                             : ''
                         }`}
                         style={{
@@ -723,178 +683,135 @@ function QuizSetupContent() {
             </Card>
           </div>
         </div>
-      </main>
+
+        {/* Sticky action bar */}
+        <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-background/85 backdrop-blur-md supports-[backdrop-filter]:bg-background/70">
+          <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-foreground tabular">
+                {questions.length} question{questions.length !== 1 ? 's' : ''}
+                <span className="font-medium text-muted-foreground"> · {MODE_LABELS[selectedMode]}</span>
+              </p>
+              <p className={cn('truncate text-xs', isValidQuiz ? 'text-success' : 'text-muted-foreground')}>
+                {isValidQuiz ? (
+                  <span className="inline-flex items-center gap-1"><Check className="h-3.5 w-3.5" /> Ready to launch</span>
+                ) : (
+                  'Need at least 3 complete questions to launch'
+                )}
+              </p>
+            </div>
+            <div className="flex shrink-0 items-center gap-2">
+              {user && (
+                <Button onClick={handleOpenSaveModal} disabled={questions.length === 0} variant="outline">
+                  <Save /> <span className="hidden sm:inline">Save draft</span>
+                </Button>
+              )}
+              <Button onClick={handleLaunchQuiz} disabled={!isValidQuiz} size="lg">
+                <Rocket /> Launch quiz
+              </Button>
+            </div>
+          </div>
+        </div>
+      </AppShell>
 
       {/* Enhancement Preview Modal */}
-      {enhancementPreview && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-dark-800 rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center space-x-2">
-                  <span className="text-2xl">✨</span>
-                  <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Enhancement Preview</h2>
-                </div>
-                <button
-                  onClick={handleRejectEnhancement}
-                  className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
-                >
-                  <span className="sr-only">Close</span>
-                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-              
-              <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
-                Review the AI-enhanced version and choose how to proceed
-              </p>
+      <Dialog open={Boolean(enhancementPreview)} onOpenChange={(open) => { if (!open) handleRejectEnhancement(); }}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-4xl">
+          {enhancementPreview && (
+            <>
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <Sparkles className="h-4 w-4 text-primary" /> Enhancement preview
+                </DialogTitle>
+                <DialogDescription>Review the AI-enhanced version and choose how to proceed.</DialogDescription>
+              </DialogHeader>
 
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-                <div>
-                  <h3 className="font-medium text-gray-700 dark:text-gray-300 mb-3 flex items-center space-x-2">
-                    <span>📝</span>
-                    <span>Original Question</span>
-                  </h3>
-                  <div className="p-4 bg-gray-50 dark:bg-dark-700 rounded-lg border dark:border-dark-600">
-                    <h4 className="font-medium mb-3 text-gray-900 dark:text-gray-100">{enhancementPreview.original.text}</h4>
-                    <div className="space-y-2">
-                      {enhancementPreview.original.options.map((option, i) => (
-                        <div key={i} className={`text-sm p-2 rounded ${enhancementPreview.original.correct === i ? 'bg-green-100 dark:bg-green-800/30 border border-green-300 dark:border-green-600 text-green-800 dark:text-green-200' : 'bg-white dark:bg-dark-600 text-gray-700 dark:text-gray-300'}`}>
-                          <span className="font-medium">{String.fromCharCode(65 + i)}: </span>
-                          {option}
-                        </div>
-                      ))}
-                    </div>
+              <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                <div className="rounded-xl border border-border bg-surface-raised p-4">
+                  <p className="eyebrow mb-3">Original</p>
+                  <h4 className="mb-3 text-sm font-semibold text-foreground">{enhancementPreview.original.text}</h4>
+                  <div className="space-y-2">
+                    {enhancementPreview.original.options.map((option, i) => (
+                      <AnswerOption
+                        key={i}
+                        label={getOptionLabel(i)}
+                        text={option}
+                        state={enhancementPreview.original.correct === i ? 'correct' : 'default'}
+                      />
+                    ))}
                   </div>
                 </div>
-                
-                <div>
-                  <h3 className="font-medium text-gray-700 dark:text-gray-300 mb-3 flex items-center space-x-2">
-                    <span>✨</span>
-                    <span>Enhanced Question</span>
-                  </h3>
-                  <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-700">
-                    <h4 className="font-medium mb-3 text-gray-900 dark:text-gray-100">{enhancementPreview.enhanced.text}</h4>
-                    <div className="space-y-2">
-                      {enhancementPreview.enhanced.options.map((option, i) => (
-                        <div key={i} className={`text-sm p-2 rounded ${enhancementPreview.enhanced.correct === i ? 'bg-green-100 dark:bg-green-800/30 border border-green-300 dark:border-green-600 text-green-800 dark:text-green-200' : 'bg-white dark:bg-dark-600 text-gray-700 dark:text-gray-300'}`}>
-                          <span className="font-medium">{String.fromCharCode(65 + i)}: </span>
-                          {option}
-                        </div>
-                      ))}
-                    </div>
+
+                <div className="rounded-xl border border-primary/40 bg-primary/5 p-4">
+                  <p className="eyebrow mb-3 text-primary">Enhanced</p>
+                  <h4 className="mb-3 text-sm font-semibold text-foreground">{enhancementPreview.enhanced.text}</h4>
+                  <div className="space-y-2">
+                    {enhancementPreview.enhanced.options.map((option, i) => (
+                      <AnswerOption
+                        key={i}
+                        label={getOptionLabel(i)}
+                        text={option}
+                        state={enhancementPreview.enhanced.correct === i ? 'correct' : 'default'}
+                      />
+                    ))}
                   </div>
                 </div>
               </div>
 
-              <div className="flex flex-col sm:flex-row justify-between items-center space-y-2 sm:space-y-0">
-                <Button 
-                  onClick={handleRejectEnhancement} 
-                  variant="outline"
-                  className="flex items-center space-x-2"
-                >
-                  <span>❌</span>
-                  <span>Reject Changes</span>
+              <DialogFooter className="gap-2 sm:justify-between">
+                <Button onClick={handleRejectEnhancement} variant="ghost">
+                  <X /> Reject changes
                 </Button>
-                <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-3">
-                  <Button 
-                    onClick={handleAcceptEnhancement}
-                    variant="outline"
-                    className="flex items-center space-x-2 bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-700 hover:bg-blue-100 dark:hover:bg-blue-900/30"
-                  >
-                    <span>✅</span>
-                    <span>Accept Changes</span>
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <Button onClick={handleAcceptEnhancement} variant="outline">
+                    <Check /> Accept changes
                   </Button>
-                  <Button 
-                    onClick={handleAcceptAndAddQuestion}
-                    className="bg-green-600 hover:bg-green-700 flex items-center space-x-2"
-                  >
-                    <span>➕</span>
-                    <span>Accept & Add to Questions</span>
+                  <Button onClick={handleAcceptAndAddQuestion}>
+                    <Plus /> Accept &amp; add to questions
                   </Button>
                 </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-      
+              </DialogFooter>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+
       {/* Save Draft Modal */}
-      {showSaveModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-dark-800 rounded-lg shadow-xl max-w-md w-full">
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
-                  Save Quiz as Draft
-                </h2>
-                <button
-                  onClick={() => {
-                    setShowSaveModal(false);
-                    setDraftName('');
-                    setErrorMessage('');
-                  }}
-                  className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
-                >
-                  <span className="sr-only">Close</span>
-                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-              
-              <div className="space-y-4">
-                <div>
-                  <label htmlFor="draftName" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Draft Name
-                  </label>
-                  <Input
-                    id="draftName"
-                    value={draftName}
-                    onChange={(e) => setDraftName(e.target.value)}
-                    placeholder="Enter a name for your quiz draft"
-                    disabled={saving}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        handleSaveDraft();
-                      }
-                    }}
-                  />
-                </div>
-                
-                <div className="flex justify-end space-x-3">
-                  <Button
-                    onClick={() => {
-                      setShowSaveModal(false);
-                      setDraftName('');
-                      setErrorMessage('');
-                    }}
-                    variant="outline"
-                    disabled={saving}
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    onClick={handleSaveDraft}
-                    disabled={saving || !draftName.trim()}
-                  >
-                    {saving ? (
-                      <span className="flex items-center space-x-2">
-                        <span className="animate-spin text-sm">🔄</span>
-                        <span>Saving...</span>
-                      </span>
-                    ) : (
-                      'Save Draft'
-                    )}
-                  </Button>
-                </div>
-              </div>
-            </div>
+      <Dialog open={showSaveModal} onOpenChange={(open) => { if (!open) closeSaveModal(); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Save quiz as draft</DialogTitle>
+            <DialogDescription>Give the draft a name so you can find it on your dashboard.</DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-2">
+            <Label htmlFor="draftName">Draft name</Label>
+            <Input
+              id="draftName"
+              value={draftName}
+              onChange={(e) => setDraftName(e.target.value)}
+              placeholder="e.g. Friday trivia, round 1"
+              disabled={saving}
+              autoFocus
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  handleSaveDraft();
+                }
+              }}
+            />
           </div>
-        </div>
-      )}
-      </div>
+
+          <DialogFooter>
+            <Button onClick={closeSaveModal} variant="outline" disabled={saving}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveDraft} disabled={saving || !draftName.trim()}>
+              {saving ? <Spinner size="sm" /> : <Save />}
+              {saving ? 'Saving…' : 'Save draft'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </ProtectedRoute>
   );
 }
@@ -939,163 +856,170 @@ function QuestionItem({
     }
   };
 
+  const reorderButtonClass = cn(
+    'flex h-9 w-9 shrink-0 flex-col items-center justify-center rounded-lg border font-display text-sm font-bold tabular transition-[background-color,border-color,color,transform,box-shadow] duration-150 focus-ring',
+    isAnimating
+      ? 'cursor-not-allowed border-border bg-muted text-muted-foreground'
+      : reorderingIndex === index
+      ? 'scale-110 border-primary bg-primary text-primary-foreground shadow-glow'
+      : isReordering
+      ? 'cursor-pointer border-success bg-success/15 text-success hover:bg-success hover:text-success-foreground'
+      : 'cursor-pointer border-border bg-surface-raised text-muted-foreground hover:border-muted-foreground/50 hover:text-foreground'
+  );
+
+  const reorderTitle = isAnimating
+    ? 'Reordering in progress...'
+    : reorderingIndex === index
+    ? 'Click another number to move here, or click again to cancel'
+    : isReordering
+    ? 'Click to move the selected question here'
+    : 'Click to reorder this question';
+
   if (isEditing) {
     return (
-      <div className="flex items-start space-x-4">
+      <div className="flex items-start gap-3">
         <button
+          type="button"
           onClick={() => onStartReordering(index)}
-          className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm transition-all duration-200 mt-2 ${
-            reorderingIndex === index
-              ? 'bg-blue-500 text-white scale-110 shadow-lg'
-              : isReordering
-              ? 'bg-green-500 hover:bg-green-600 text-white cursor-pointer shadow-md hover:scale-105'
-              : 'bg-blue-500 text-white'
-          }`}
-          title={
-            reorderingIndex === index
-              ? 'Click another number to move here, or click again to cancel'
-              : isReordering
-              ? 'Click to move the selected question here'
-              : 'Click to reorder this question'
-          }
+          className={cn(reorderButtonClass, 'mt-3')}
+          title={reorderTitle}
+          aria-label={`Question ${index + 1}, reorder`}
           disabled={!isReordering && reorderingIndex === null}
         >
           {index + 1}
         </button>
-        <Card className="border-blue-200 bg-blue-50 dark:border-blue-700 dark:bg-blue-900/20 flex-1">
-          <CardHeader>
-            <CardTitle className="text-lg dark:text-gray-100">Edit Question</CardTitle>
+        <Card className="flex-1 border-primary/50 shadow-glow">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">Edit question {index + 1}</CardTitle>
           </CardHeader>
-        <CardContent className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Question</label>
-            <Input
-              value={editedQuestion.text}
-              onChange={(e) => setEditedQuestion({ ...editedQuestion, text: e.target.value })}
-              placeholder="Enter your question..."
-            />
-          </div>
-          
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Answer Options</label>
+          <CardContent className="space-y-4">
             <div className="space-y-2">
-              {editedQuestion.options.map((option, optionIndex) => (
-                <div key={optionIndex} className="flex items-center space-x-3">
-                  <input
-                    type="radio"
-                    name={`correct-${index}`}
-                    checked={editedQuestion.correct === optionIndex}
-                    onChange={() => setEditedQuestion({ ...editedQuestion, correct: optionIndex })}
-                    className="text-green-600"
-                  />
-                  <span className="w-6 text-sm font-medium text-gray-600 dark:text-gray-400">
-                    {String.fromCharCode(65 + optionIndex)}:
-                  </span>
-                  <Input
-                    value={option}
-                    onChange={(e) => {
-                      const updatedOptions = [...editedQuestion.options];
-                      updatedOptions[optionIndex] = e.target.value;
-                      setEditedQuestion({ ...editedQuestion, options: updatedOptions });
-                    }}
-                    placeholder={`Option ${String.fromCharCode(65 + optionIndex)}`}
-                    className="flex-1"
-                  />
-                </div>
-              ))}
+              <Label htmlFor={`edit-q-${index}`}>Question</Label>
+              <Input
+                id={`edit-q-${index}`}
+                value={editedQuestion.text}
+                onChange={(e) => setEditedQuestion({ ...editedQuestion, text: e.target.value })}
+                placeholder="Enter your question..."
+              />
             </div>
-          </div>
 
-          <div className="flex justify-end space-x-3">
-            <Button onClick={onCancelEdit} variant="outline">Cancel</Button>
-            <Button 
-              onClick={handleSave}
-              disabled={!editedQuestion.text.trim() || !editedQuestion.options.every(opt => opt.trim())}
-            >
-              Save Question
-            </Button>
-          </div>
-        </CardContent>
+            <fieldset className="space-y-2">
+              <legend className="text-sm font-medium leading-none">Answer options</legend>
+              <div className="space-y-2 pt-1">
+                {editedQuestion.options.map((option, optionIndex) => {
+                  const isCorrect = editedQuestion.correct === optionIndex
+                  return (
+                    <div
+                      key={optionIndex}
+                      className={cn(
+                        'flex items-center gap-2 rounded-lg border p-1.5 pl-3 transition-colors',
+                        isCorrect ? 'border-success/50 bg-success/5' : 'border-transparent'
+                      )}
+                    >
+                      <input
+                        type="radio"
+                        name={`correct-${index}`}
+                        aria-label={`Mark option ${getOptionLabel(optionIndex)} as correct`}
+                        checked={isCorrect}
+                        onChange={() => setEditedQuestion({ ...editedQuestion, correct: optionIndex })}
+                      />
+                      <span className={cn('w-5 text-sm font-bold', isCorrect ? 'text-success' : 'text-muted-foreground')}>
+                        {getOptionLabel(optionIndex)}
+                      </span>
+                      <Input
+                        value={option}
+                        onChange={(e) => {
+                          const updatedOptions = [...editedQuestion.options];
+                          updatedOptions[optionIndex] = e.target.value;
+                          setEditedQuestion({ ...editedQuestion, options: updatedOptions });
+                        }}
+                        placeholder={`Option ${getOptionLabel(optionIndex)}`}
+                        className="h-10 flex-1"
+                        aria-label={`Option ${getOptionLabel(optionIndex)}`}
+                      />
+                    </div>
+                  )
+                })}
+              </div>
+            </fieldset>
+
+            <div className="flex justify-end gap-2">
+              <Button onClick={onCancelEdit} variant="ghost">Cancel</Button>
+              <Button
+                onClick={handleSave}
+                disabled={!editedQuestion.text.trim() || !editedQuestion.options.every(opt => opt.trim())}
+              >
+                <Check /> Save question
+              </Button>
+            </div>
+          </CardContent>
         </Card>
       </div>
     );
   }
 
   return (
-    <div className="flex items-start space-x-4">
+    <div className="flex items-start gap-3">
       {/* Clickable number for reordering */}
       <button
+        type="button"
         onClick={() => onStartReordering(index)}
         disabled={isAnimating}
-        className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm transition-all duration-200 ${
-          isAnimating
-            ? 'bg-gray-300 dark:bg-dark-500 text-gray-400 dark:text-gray-500 cursor-not-allowed'
-            : reorderingIndex === index
-            ? 'bg-blue-500 text-white scale-110 shadow-lg'
-            : isReordering
-            ? 'bg-green-500 hover:bg-green-600 text-white cursor-pointer shadow-md hover:scale-105'
-            : 'bg-gray-200 dark:bg-dark-600 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-dark-500 cursor-pointer'
-        }`}
-        title={
-          isAnimating
-            ? 'Reordering in progress...'
-            : reorderingIndex === index
-            ? 'Click another number to move here, or click again to cancel'
-            : isReordering
-            ? 'Click to move the selected question here'
-            : 'Click to reorder this question'
-        }
+        className={cn(reorderButtonClass, 'mt-3')}
+        title={reorderTitle}
+        aria-label={`Question ${index + 1}, reorder`}
+        aria-pressed={reorderingIndex === index}
       >
         {index + 1}
       </button>
 
       {/* Question card */}
-      <Card className={`hover:shadow-md transition-shadow flex-1 ${
-        reorderingIndex === index ? 'ring-2 ring-blue-500 bg-blue-50 dark:bg-blue-900/20' : ''
-      }`}>
+      <Card
+        className={cn(
+          'min-w-0 flex-1 transition-[border-color,box-shadow] duration-150',
+          reorderingIndex === index ? 'border-primary shadow-glow' : isReordering ? 'border-dashed' : 'hover:border-muted-foreground/40'
+        )}
+      >
         <CardContent className="p-4">
-          <div className="flex items-start justify-between">
-            <div className="flex-1">
-              <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-3">
-                {question.text}
-              </h3>
-              <div className="grid grid-cols-2 gap-2">
-                {question.options.map((option, optionIndex) => (
-                  <div 
-                    key={optionIndex}
-                    className={`p-2 rounded border text-sm ${
-                      question.correct === optionIndex 
-                        ? 'bg-green-100 dark:bg-green-800/30 border-green-300 dark:border-green-600 text-green-800 dark:text-green-200' 
-                        : 'bg-gray-50 dark:bg-dark-700 border-gray-200 dark:border-dark-600 dark:text-gray-300'
-                    }`}
-                  >
-                    <span className="font-medium">{String.fromCharCode(65 + optionIndex)}: </span>
-                    {option}
-                  </div>
-                ))}
-              </div>
-            </div>
-            
-            <div className="flex space-x-1 ml-4">
-              <Button 
-                onClick={onStartEdit} 
-                variant="outline" 
-                size="sm" 
-                className="text-xs"
+          <div className="flex items-start justify-between gap-3">
+            <h3 className="min-w-0 flex-1 text-sm font-semibold leading-snug text-foreground sm:text-[15px]">
+              {question.text}
+            </h3>
+            <div className="flex shrink-0 items-center gap-1">
+              <Button
+                onClick={onStartEdit}
+                variant="ghost"
+                size="icon-sm"
+                aria-label="Edit question"
                 disabled={isReordering || isAnimating}
               >
-                Edit
+                <Pencil />
               </Button>
-              <Button 
-                onClick={onDelete} 
-                variant="destructive" 
-                size="sm" 
-                className="text-xs"
+              <Button
+                onClick={onDelete}
+                variant="ghost"
+                size="icon-sm"
+                aria-label="Delete question"
+                className="text-muted-foreground hover:text-destructive"
                 disabled={isReordering || isAnimating}
               >
-                Delete
+                <Trash2 />
               </Button>
+              <span className="ml-1 hidden text-muted-foreground/50 sm:inline" aria-hidden="true">
+                <GripVertical className="h-4 w-4" />
+              </span>
             </div>
+          </div>
+          <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+            {question.options.map((option, optionIndex) => (
+              <AnswerOption
+                key={optionIndex}
+                label={getOptionLabel(optionIndex)}
+                text={option}
+                state={question.correct === optionIndex ? 'correct' : 'default'}
+                className="min-h-10 py-2"
+              />
+            ))}
           </div>
         </CardContent>
       </Card>
@@ -1105,12 +1029,7 @@ function QuestionItem({
 
 export default function QuizSetupPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-gray-50 dark:bg-dark-900 flex items-center justify-center">
-      <div className="text-center">
-        <div className="animate-spin text-4xl mb-4">🔄</div>
-        <p className="text-gray-600 dark:text-gray-400">Loading quiz setup...</p>
-      </div>
-    </div>}>
+    <Suspense fallback={<LoadingScreen label="Loading quiz setup..." />}>
       <QuizSetupContent />
     </Suspense>
   );

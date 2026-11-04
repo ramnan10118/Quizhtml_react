@@ -1,7 +1,9 @@
 import * as React from 'react'
-import { Card, CardContent, CardHeader, CardTitle, Button, Badge, cn } from '@/components/ui'
+import { CheckCircle2, HelpCircle, ListChecks, RotateCcw, XCircle } from 'lucide-react'
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, Button, Badge, StatTile, cn } from '@/components/ui'
 import { QuizQuestion, ParticipantSubmission, QuizMode } from '@/types/quiz'
 import { getOptionLabel } from '@/lib/utils'
+import { AnswerOption, type AnswerOptionState } from './AnswerOption'
 import confetti from 'canvas-confetti'
 
 const { useEffect } = React
@@ -14,6 +16,34 @@ interface QuizResultsDisplayProps {
   passingScore?: number
   onRetake?: () => void
   className?: string
+}
+
+/** Circular score meter. */
+function ScoreRing({ percentage, className }: { percentage: number; className?: string }) {
+  const r = 52
+  const c = 2 * Math.PI * r
+  const offset = c - (Math.max(0, Math.min(100, percentage)) / 100) * c
+  return (
+    <svg viewBox="0 0 120 120" className={cn('h-36 w-36', className)} role="img" aria-label={`${percentage} percent`}>
+      <circle cx="60" cy="60" r={r} fill="none" stroke="hsl(var(--muted))" strokeWidth="10" />
+      <circle
+        cx="60"
+        cy="60"
+        r={r}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="10"
+        strokeLinecap="round"
+        strokeDasharray={c}
+        strokeDashoffset={offset}
+        transform="rotate(-90 60 60)"
+        style={{ transition: 'stroke-dashoffset 800ms cubic-bezier(0.16, 1, 0.3, 1)' }}
+      />
+      <text x="60" y="60" textAnchor="middle" dominantBaseline="central" className="fill-foreground font-display text-[26px] font-bold tabular">
+        {percentage}%
+      </text>
+    </svg>
+  )
 }
 
 export function QuizResultsDisplay({
@@ -45,85 +75,72 @@ export function QuizResultsDisplay({
   }, [percentage])
 
   const getScoreColor = () => {
-    if (percentage >= 90) return 'text-green-600 dark:text-green-400'
-    if (percentage >= 70) return 'text-blue-600 dark:text-blue-400'
-    if (percentage >= 50) return 'text-yellow-600 dark:text-yellow-400'
-    return 'text-red-600 dark:text-red-400'
+    if (percentage >= 90) return 'text-success'
+    if (percentage >= 70) return 'text-info'
+    if (percentage >= 50) return 'text-warning'
+    return 'text-destructive'
   }
 
   const getScoreStatus = () => {
-    if (percentage >= 90) return { label: 'Excellent!', icon: '🏆' }
-    if (percentage >= 80) return { label: 'Great Job!', icon: '🎉' }
-    if (percentage >= 70) return { label: 'Well Done!', icon: '👏' }
-    if (percentage >= 50) return { label: 'Not Bad!', icon: '👍' }
-    return { label: 'Keep Trying!', icon: '💪' }
+    if (percentage >= 90) return { label: 'Excellent' }
+    if (percentage >= 80) return { label: 'Great job' }
+    if (percentage >= 70) return { label: 'Well done' }
+    if (percentage >= 50) return { label: 'Not bad' }
+    return { label: 'Keep practising' }
   }
 
   const status = getScoreStatus()
+  const correctCount = submission.answers.filter((a, i) => a.selectedOption === questions[i]?.correct).length
+  const incorrectCount = submission.answers.filter((a, i) => a.selectedOption !== -1 && a.selectedOption !== questions[i]?.correct).length
+  const skippedCount = submission.answers.filter(a => a.selectedOption === -1).length
 
   return (
-    <div className={cn('w-full max-w-4xl mx-auto space-y-6', className)}>
+    <div className={cn('w-full max-w-4xl mx-auto space-y-5', className)}>
       {/* Main Results Card */}
-      <Card className="text-center">
-        <CardHeader className="pb-4">
-          <div className="mx-auto mb-4">
-            <span className="text-6xl" role="img" aria-label="Result">
-              {status.icon}
-            </span>
-          </div>
-          <CardTitle className="text-2xl md:text-3xl">
-            {status.label}
-          </CardTitle>
-          <p className="text-muted-foreground">
-            Quiz completed by {submission.participantName}
-          </p>
-        </CardHeader>
-        
-        <CardContent className="space-y-6">
-          {/* Score Display */}
-          <div className="space-y-2">
-            <div className={cn('text-4xl md:text-5xl font-bold', getScoreColor())}>
-              {score}/{totalQuestions}
+      <Card className="stage-bg overflow-hidden">
+        <CardContent className="flex flex-col items-center gap-6 p-6 text-center sm:flex-row sm:text-left sm:p-8">
+          <ScoreRing percentage={percentage} className={getScoreColor()} />
+          <div className="min-w-0 flex-1">
+            <p className="eyebrow">{mode === 'basic' ? 'Self-paced quiz' : 'Quiz'} · results</p>
+            <h2 className="mt-1 font-display text-3xl font-bold text-foreground">{status.label}</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {submission.participantName} scored{' '}
+              <span className={cn('font-semibold tabular', getScoreColor())}>{score}/{totalQuestions}</span>
+              {' · '}completed {new Date(submission.submissionTime).toLocaleString()}
+            </p>
+            <div className="mt-4 flex flex-wrap items-center justify-center gap-2 sm:justify-start">
+              {passingScore && (
+                <Badge variant={isPassed ? 'success' : 'destructive'}>
+                  {isPassed ? `Passed · ${passingScore}% required` : `Below pass mark · ${passingScore}% required`}
+                </Badge>
+              )}
+              {onRetake && (
+                <Button onClick={onRetake} variant="outline" size="sm">
+                  <RotateCcw /> Take quiz again
+                </Button>
+              )}
             </div>
-            <div className={cn('text-xl font-semibold', getScoreColor())}>
-              {percentage}%
-            </div>
-            
-            {passingScore && (
-              <Badge 
-                variant={isPassed ? "default" : "destructive"}
-                className="mt-2"
-              >
-                {isPassed ? `Passed (${passingScore}% required)` : `Failed (${passingScore}% required)`}
-              </Badge>
-            )}
           </div>
-
-          {/* Completion Time */}
-          <div className="text-sm text-muted-foreground">
-            Completed on {new Date(submission.submissionTime).toLocaleString()}
-          </div>
-
-          {/* Retake Button */}
-          {onRetake && (
-            <Button onClick={onRetake} variant="outline">
-              Take Quiz Again
-            </Button>
-          )}
         </CardContent>
       </Card>
+
+      {/* Summary Stats */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <StatTile label="Correct" value={correctCount} tone="success" icon={<CheckCircle2 />} />
+        <StatTile label="Incorrect" value={incorrectCount} tone="destructive" icon={<XCircle />} />
+        <StatTile label="Skipped" value={skippedCount} icon={<HelpCircle />} />
+        <StatTile label="Score" value={`${percentage}%`} tone="primary" icon={<ListChecks />} />
+      </div>
 
       {/* Detailed Results */}
       {showCorrectAnswers && (
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
-              <span>📋</span>
-              <span>Question Review</span>
-            </CardTitle>
+            <CardTitle>Question review</CardTitle>
+            <CardDescription>Your answer against the correct one for every question.</CardDescription>
           </CardHeader>
-          
-          <CardContent className="space-y-6">
+
+          <CardContent className="divide-y divide-border">
             {questions.map((question, questionIndex) => {
               const userAnswer = submission.answers.find(a => a.questionIndex === questionIndex)
               const selectedOption = userAnswer?.selectedOption || -1
@@ -131,82 +148,51 @@ export function QuizResultsDisplay({
               const wasAnswered = selectedOption !== -1
 
               return (
-                <div key={questionIndex} className="space-y-3">
-                  <div className="flex items-start space-x-3">
-                    <div className={cn(
-                      'flex items-center justify-center w-8 h-8 rounded-full text-sm font-semibold flex-shrink-0',
-                      isCorrect 
-                        ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                        : wasAnswered
-                        ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-                        : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400'
-                    )}>
-                      {isCorrect ? '✓' : wasAnswered ? '✗' : '?'}
-                    </div>
-                    
-                    <div className="flex-1">
-                      <h3 className="font-medium text-foreground mb-2">
-                        {questionIndex + 1}. {question.text}
-                      </h3>
-                      
-                      <div className="space-y-2">
-                        {question.options.map((option, optionIndex) => {
-                          const isSelected = selectedOption === optionIndex
-                          const isCorrectOption = optionIndex === question.correct
-                          
-                          let optionStyle = 'border-border bg-background'
-                          
-                          if (isCorrectOption) {
-                            optionStyle = 'border-green-500 bg-green-50 dark:bg-green-900/20'
-                          } else if (isSelected && !isCorrect) {
-                            optionStyle = 'border-red-500 bg-red-50 dark:bg-red-900/20'
-                          }
+                <div key={questionIndex} className="flex items-start gap-3 py-5 first:pt-0 last:pb-0">
+                  <div className={cn(
+                    'mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md [&_svg]:size-4',
+                    isCorrect
+                      ? 'bg-success/15 text-success'
+                      : wasAnswered
+                      ? 'bg-destructive/15 text-destructive'
+                      : 'bg-muted text-muted-foreground'
+                  )}>
+                    {isCorrect ? <CheckCircle2 /> : wasAnswered ? <XCircle /> : <HelpCircle />}
+                  </div>
 
-                          return (
-                            <div
-                              key={optionIndex}
-                              className={cn(
-                                'p-3 rounded-lg border-2',
-                                optionStyle
-                              )}
-                            >
-                              <div className="flex items-center space-x-3">
-                                <span className="text-sm font-semibold text-muted-foreground">
-                                  {getOptionLabel(optionIndex)}
-                                </span>
-                                <span className="flex-1 text-sm">
-                                  {option}
-                                </span>
-                                <div className="flex items-center space-x-1">
-                                  {isSelected && (
-                                    <Badge 
-                                      variant="secondary" 
-                                      className="text-xs"
-                                    >
-                                      Your Answer
-                                    </Badge>
-                                  )}
-                                  {isCorrectOption && (
-                                    <Badge 
-                                      variant="default" 
-                                      className="text-xs bg-green-600"
-                                    >
-                                      Correct
-                                    </Badge>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                          )
-                        })}
-                      </div>
-                      
-                      {!wasAnswered && (
-                        <p className="text-sm text-muted-foreground mt-2">
-                          No answer provided
-                        </p>
-                      )}
+                  <div className="min-w-0 flex-1">
+                    <h3 className="text-sm font-semibold leading-snug text-foreground sm:text-[15px]">
+                      <span className="text-muted-foreground tabular">{questionIndex + 1}.</span> {question.text}
+                    </h3>
+
+                    <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                      {question.options.map((option, optionIndex) => {
+                        const isSelected = selectedOption === optionIndex
+                        const isCorrectOption = optionIndex === question.correct
+                        let state: AnswerOptionState = 'default'
+                        if (isCorrectOption) state = 'correct'
+                        else if (isSelected && !isCorrect) state = 'wrong'
+
+                        return (
+                          <AnswerOption
+                            key={optionIndex}
+                            label={getOptionLabel(optionIndex)}
+                            text={option}
+                            state={state}
+                            trailing={
+                              <>
+                                {isSelected && <Badge variant="secondary">Yours</Badge>}
+                                {isCorrectOption && <Badge variant="success">Correct</Badge>}
+                              </>
+                            }
+                          />
+                        )
+                      })}
                     </div>
+
+                    {!wasAnswered && (
+                      <p className="mt-2 text-xs text-muted-foreground">No answer provided</p>
+                    )}
                   </div>
                 </div>
               )
@@ -214,38 +200,6 @@ export function QuizResultsDisplay({
           </CardContent>
         </Card>
       )}
-
-      {/* Summary Stats */}
-      <Card>
-        <CardContent className="p-4">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
-            <div>
-              <div className="text-lg font-semibold text-green-600 dark:text-green-400">
-                {submission.answers.filter((a, i) => a.selectedOption === questions[i]?.correct).length}
-              </div>
-              <div className="text-xs text-muted-foreground">Correct</div>
-            </div>
-            <div>
-              <div className="text-lg font-semibold text-red-600 dark:text-red-400">
-                {submission.answers.filter((a, i) => a.selectedOption !== -1 && a.selectedOption !== questions[i]?.correct).length}
-              </div>
-              <div className="text-xs text-muted-foreground">Incorrect</div>
-            </div>
-            <div>
-              <div className="text-lg font-semibold text-gray-600 dark:text-gray-400">
-                {submission.answers.filter(a => a.selectedOption === -1).length}
-              </div>
-              <div className="text-xs text-muted-foreground">Skipped</div>
-            </div>
-            <div>
-              <div className="text-lg font-semibold text-primary">
-                {percentage}%
-              </div>
-              <div className="text-xs text-muted-foreground">Score</div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
     </div>
   )
 }

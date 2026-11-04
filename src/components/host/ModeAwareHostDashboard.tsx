@@ -1,4 +1,5 @@
 import * as React from 'react'
+import { Check, Copy, Link2, Settings, Users } from 'lucide-react'
 import { QuizMode, QuizSettings, ParticipantSubmission, LeaderboardEntry, RevealState, QuizQuestion } from '@/types/quiz'
 import { HostDashboardTabs, type HostDashboardTab } from './HostDashboardTabs'
 import { BasicQuizHostControls } from './BasicQuizHostControls'
@@ -6,7 +7,7 @@ import { ScheduledQuizHostControls } from './ScheduledQuizHostControls'
 import { ResultsTab } from './ResultsTab'
 import { QuizControls } from '@/components/quiz/QuizControls' // Existing buzzer controls
 import { ParticipantList } from '@/components/quiz/ParticipantList' // Existing participant list
-import { Card, CardContent, CardHeader, CardTitle, Button, Badge, cn } from '@/components/ui'
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, Button, Badge, Input, Label, EmptyState, cn } from '@/components/ui'
 
 const { useState, useEffect } = React
 
@@ -14,26 +15,26 @@ interface ModeAwareHostDashboardProps {
   mode: QuizMode
   settings: QuizSettings
   questions: QuizQuestion[]
-  
+
   // Basic mode data
   basicSubmissions?: ParticipantSubmission[]
-  
+
   // Scheduled mode data
   scheduledSubmissions?: ParticipantSubmission[]
   revealedQuestions?: RevealState[]
   leaderboard?: LeaderboardEntry[]
   leaderboardVisible?: boolean
-  
+
   // Buzzer mode data (existing)
   participants?: Array<{ name: string; socketId: string }>
   scores?: Array<{ teamName: string; score: number }>
-  
+
   // Common
   participantCount: number
   submissionCount: number
   currentSessionId?: string | null
   searchParams?: URLSearchParams
-  
+
   // Callbacks
   onSettingsUpdate: (settings: Partial<QuizSettings>) => void
   onRevealQuestion?: (questionIndex: number) => void
@@ -41,8 +42,14 @@ interface ModeAwareHostDashboardProps {
   onToggleLeaderboardVisibility?: () => void
   onSendAnnouncement?: (message: string) => void
   onRefreshData?: () => void
-  
+
   className?: string
+}
+
+const MODE_LABELS: Record<QuizMode, string> = {
+  buzzer: 'Buzzer',
+  basic: 'Self-paced',
+  scheduled: 'Scheduled reveal',
 }
 
 export function ModeAwareHostDashboard({
@@ -69,6 +76,7 @@ export function ModeAwareHostDashboard({
   className
 }: ModeAwareHostDashboardProps) {
   const [currentTab, setCurrentTab] = useState<HostDashboardTab>('control')
+  const [copiedShare, setCopiedShare] = useState(false)
 
   // Debug logging for session ID
   React.useEffect(() => {
@@ -99,7 +107,7 @@ export function ModeAwareHostDashboard({
             onRefreshData={onRefreshData || (() => {})}
           />
         )
-      
+
       case 'scheduled':
         return (
           <ScheduledQuizHostControls
@@ -114,7 +122,7 @@ export function ModeAwareHostDashboard({
             onSendAnnouncement={onSendAnnouncement || (() => {})}
           />
         )
-      
+
       case 'buzzer':
       default:
         return (
@@ -139,7 +147,7 @@ export function ModeAwareHostDashboard({
         timestamp: Date.now(),
         rank: index + 1
       }))
-      
+
       return (
         <ParticipantList
           rankings={rankings}
@@ -160,7 +168,7 @@ export function ModeAwareHostDashboard({
           submissionTime: sub.submissionTime
         }))
       }
-      
+
       if (mode === 'scheduled') {
         return scheduledSubmissions.map(sub => ({
           name: sub.participantName,
@@ -169,7 +177,7 @@ export function ModeAwareHostDashboard({
           score: undefined // No score for scheduled until revealed
         }))
       }
-      
+
       return []
     }
 
@@ -177,59 +185,58 @@ export function ModeAwareHostDashboard({
 
     return (
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <span>👥</span>
-            <span>Participants ({participantCount})</span>
-            {submissionCount > 0 && (
-              <Badge variant="secondary">
-                {submissionCount} {mode === 'basic' ? 'completed' : 'submitted'}
-              </Badge>
-            )}
-          </CardTitle>
+        <CardHeader className="flex-row items-start justify-between gap-3 space-y-0">
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              <Users className="h-4 w-4 text-primary" /> Participants
+              <span className="text-muted-foreground tabular">({participantCount})</span>
+            </CardTitle>
+            <CardDescription>Everyone who has joined this session</CardDescription>
+          </div>
+          {submissionCount > 0 && (
+            <Badge variant="success" className="tabular">
+              {submissionCount} {mode === 'basic' ? 'completed' : 'submitted'}
+            </Badge>
+          )}
         </CardHeader>
-        
+
         <CardContent>
           {participantData.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              No participants yet. Share the quiz link to get started.
-            </div>
+            <EmptyState
+              compact
+              icon={<Users />}
+              title="No participants yet"
+              description="Share the join link or QR code to get people in."
+            />
           ) : (
-            <div className="space-y-3">
-              {participantData.map((participant, index) => (
-                <div
-                  key={index}
-                  className="flex items-center justify-between p-3 bg-muted/30 rounded-lg"
-                >
-                  <div className="flex items-center space-x-3">
-                    <div className={cn(
-                      "w-2 h-2 rounded-full",
-                      participant.status === 'Completed' || participant.status === 'Submitted'
-                        ? "bg-green-500"
-                        : "bg-yellow-500"
-                    )} />
-                    <div>
-                      <div className="font-medium">{participant.name}</div>
-                      <div className="text-xs text-muted-foreground">
-                        {participant.status}
-                        {participant.submissionTime && (
-                          <span className="ml-2">
-                            {new Date(participant.submissionTime).toLocaleTimeString()}
-                          </span>
-                        )}
+            <ul className="divide-y divide-border">
+              {participantData.map((participant, index) => {
+                const done = participant.status === 'Completed' || participant.status === 'Submitted'
+                return (
+                  <li key={index} className="flex items-center justify-between gap-3 py-3 first:pt-0 last:pb-0">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <span className={cn('h-2 w-2 shrink-0 rounded-full', done ? 'bg-success' : 'bg-warning animate-live-dot')} />
+                      <div className="min-w-0">
+                        <div className="truncate text-sm font-semibold text-foreground">{participant.name}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {participant.status}
+                          {participant.submissionTime && (
+                            <span className="ml-2 tabular">{new Date(participant.submissionTime).toLocaleTimeString()}</span>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                  
-                  {participant.score !== undefined && (
-                    <div className="text-right">
-                      <div className="font-semibold">{participant.score}</div>
-                      <div className="text-xs text-muted-foreground">points</div>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
+
+                    {participant.score !== undefined && (
+                      <div className="text-right">
+                        <div className="font-display text-base font-bold tabular text-foreground">{participant.score}</div>
+                        <div className="text-[11px] text-muted-foreground">points</div>
+                      </div>
+                    )}
+                  </li>
+                )
+              })}
+            </ul>
           )}
         </CardContent>
       </Card>
@@ -258,13 +265,13 @@ export function ModeAwareHostDashboard({
 
   const renderSettingsTab = () => {
     // Generate share URL with debug logging
-    const shareUrl = currentSessionId 
+    const shareUrl = currentSessionId
       ? `${typeof window !== 'undefined' ? window.location.origin : ''}/quiz/join?session=${currentSessionId}`
-      : (searchParams?.get('live') 
+      : (searchParams?.get('live')
           ? `${typeof window !== 'undefined' ? window.location.origin : ''}/quiz/join?session=${searchParams.get('live')}`
           : `${typeof window !== 'undefined' ? window.location.origin : ''}/quiz/join`
         );
-    
+
     console.log('🔗 Settings Tab - Generated share URL:', shareUrl);
     console.log('🔗 Settings Tab - currentSessionId:', currentSessionId);
     console.log('🔗 Settings Tab - live param:', searchParams?.get('live'));
@@ -272,144 +279,137 @@ export function ModeAwareHostDashboard({
     return (
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <span>⚙️</span>
-            <span>Quiz Settings</span>
+          <CardTitle className="flex items-center gap-2">
+            <Settings className="h-4 w-4 text-primary" /> Quiz settings
           </CardTitle>
+          <CardDescription>Mode, rules and the join link for this session.</CardDescription>
         </CardHeader>
-        
-        <CardContent className="space-y-4">
+
+        <CardContent className="space-y-6">
           {/* Mode Display */}
-          <div className="p-3 bg-muted/30 rounded-lg">
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="font-medium">Quiz Mode</div>
-                <div className="text-sm text-muted-foreground capitalize">
-                  {mode} Quiz
-                </div>
-              </div>
-              <Badge variant="outline" className="capitalize">
-                {mode}
-              </Badge>
+          <div className="flex items-center justify-between rounded-lg border border-border bg-surface-raised p-4">
+            <div>
+              <p className="eyebrow">Quiz mode</p>
+              <p className="mt-0.5 text-sm font-semibold text-foreground">{MODE_LABELS[mode]}</p>
             </div>
+            <Badge variant="outline" className="capitalize">{mode}</Badge>
           </div>
 
           {/* Settings Form */}
-          <div className="space-y-4">
+          <div className="space-y-5">
             {mode === 'basic' && (
               <>
-                <div>
-                  <label className="block text-sm font-medium mb-2">
-                    Time Limit (minutes)
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    max="180"
-                    value={settings.timeLimit ? Math.floor(settings.timeLimit / 60) : 0}
-                    onChange={(e) => onSettingsUpdate({ 
-                      timeLimit: parseInt(e.target.value) * 60 || undefined 
-                    })}
-                    className="w-full px-3 py-2 border rounded-md"
-                    placeholder="No limit"
-                  />
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="settings-time-limit">Time limit (minutes)</Label>
+                    <Input
+                      id="settings-time-limit"
+                      type="number"
+                      min="0"
+                      max="180"
+                      value={settings.timeLimit ? Math.floor(settings.timeLimit / 60) : 0}
+                      onChange={(e) => onSettingsUpdate({
+                        timeLimit: parseInt(e.target.value) * 60 || undefined
+                      })}
+                      placeholder="No limit"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="settings-passing-score">Passing score (%)</Label>
+                    <Input
+                      id="settings-passing-score"
+                      type="number"
+                      min="0"
+                      max="100"
+                      value={settings.passingScore || ''}
+                      onChange={(e) => onSettingsUpdate({
+                        passingScore: parseInt(e.target.value) || undefined
+                      })}
+                      placeholder="No passing score"
+                    />
+                  </div>
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium mb-2">
-                    Passing Score (%)
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    max="100"
-                    value={settings.passingScore || ''}
-                    onChange={(e) => onSettingsUpdate({ 
-                      passingScore: parseInt(e.target.value) || undefined 
-                    })}
-                    className="w-full px-3 py-2 border rounded-md"
-                    placeholder="No passing score"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <label className="flex items-center space-x-2">
+                <div className="space-y-3">
+                  <label className="flex min-h-11 cursor-pointer items-center gap-3 rounded-lg border border-border px-3 py-2 text-sm hover:bg-accent/50">
                     <input
                       type="checkbox"
                       checked={settings.allowRetakes || false}
                       onChange={(e) => onSettingsUpdate({ allowRetakes: e.target.checked })}
                     />
-                    <span className="text-sm">Allow retakes</span>
+                    <span>Allow retakes</span>
                   </label>
-                  
-                  <label className="flex items-center space-x-2">
+
+                  <label className="flex min-h-11 cursor-pointer items-center gap-3 rounded-lg border border-border px-3 py-2 text-sm hover:bg-accent/50">
                     <input
                       type="checkbox"
                       checked={settings.showCorrectAnswers !== false}
                       onChange={(e) => onSettingsUpdate({ showCorrectAnswers: e.target.checked })}
                     />
-                    <span className="text-sm">Show correct answers in results</span>
+                    <span>Show correct answers in results</span>
                   </label>
                 </div>
               </>
             )}
 
             {mode === 'scheduled' && (
-              <div className="space-y-3">
-                <h4 className="font-medium">Scheduled Mode Settings</h4>
-                <p className="text-sm text-muted-foreground">
+              <div className="rounded-lg border border-dashed border-border p-4">
+                <h4 className="text-sm font-semibold text-foreground">Scheduled reveal</h4>
+                <p className="mt-1 text-sm text-muted-foreground">
                   Participants submit answers first, then you control when to reveal results.
-                  Use the Control Panel to manage reveals and leaderboard visibility.
+                  Use the Control tab to manage reveals and leaderboard visibility.
                 </p>
               </div>
             )}
 
             {mode === 'buzzer' && (
-              <div className="space-y-3">
-                <h4 className="font-medium">Buzzer Mode Settings</h4>
-                <p className="text-sm text-muted-foreground">
+              <div className="rounded-lg border border-dashed border-border p-4">
+                <h4 className="text-sm font-semibold text-foreground">Buzzer</h4>
+                <p className="mt-1 text-sm text-muted-foreground">
                   Real-time competitive quiz with instant buzzing.
-                  Use the Control Panel to navigate questions and manage the quiz flow.
+                  Use the Control tab to navigate questions and manage the quiz flow.
                 </p>
               </div>
             )}
           </div>
 
           {/* Share Controls */}
-          <Card className="mt-6">
-            <CardHeader>
-              <CardTitle className="text-base">Share Quiz</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="flex items-center space-x-2">
-                <input
-                  type="text"
-                  value={shareUrl}
-                  readOnly
-                  className="flex-1 px-3 py-2 text-sm border rounded bg-muted"
-                />
-                <Button
-                  size="sm"
-                  onClick={() => {
-                    navigator.clipboard.writeText(shareUrl);
-                    console.log('📋 Copied share URL:', shareUrl);
-                  }}
-                >
-                  Copy
-                </Button>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Share this link with participants to join your {mode} quiz
-              </p>
-            </CardContent>
-          </Card>
+          <div className="rounded-lg border border-border bg-surface-raised p-4">
+            <p className="eyebrow flex items-center gap-1.5"><Link2 className="h-3.5 w-3.5" /> Join link</p>
+            <div className="mt-2 flex items-center gap-2">
+              <input
+                type="text"
+                value={shareUrl}
+                readOnly
+                aria-label="Join link"
+                className="h-10 min-w-0 flex-1 rounded-md border border-input bg-surface px-3 font-mono text-xs text-foreground focus-ring"
+              />
+              <Button
+                size="sm"
+                variant={copiedShare ? 'success' : 'default'}
+                onClick={() => {
+                  navigator.clipboard.writeText(shareUrl);
+                  console.log('📋 Copied share URL:', shareUrl);
+                  setCopiedShare(true)
+                  setTimeout(() => setCopiedShare(false), 2000)
+                }}
+              >
+                {copiedShare ? <Check /> : <Copy />}
+                {copiedShare ? 'Copied' : 'Copy'}
+              </Button>
+            </div>
+            <p className="mt-2 text-xs text-muted-foreground">
+              Share this link with participants to join your {MODE_LABELS[mode].toLowerCase()} quiz.
+            </p>
+          </div>
         </CardContent>
       </Card>
     )
   }
 
   return (
-    <div className={cn('w-full space-y-6', className)}>
+    <div className={cn('w-full', className)}>
       <HostDashboardTabs
         currentTab={currentTab}
         onTabChange={setCurrentTab}
@@ -418,7 +418,7 @@ export function ModeAwareHostDashboard({
         submissionCount={submissionCount}
       />
 
-      <div className="min-h-[400px]">
+      <div className="min-h-[400px] animate-fade-in" key={currentTab}>
         {currentTab === 'control' && renderControlPanel()}
         {currentTab === 'participants' && renderParticipantsTab()}
         {currentTab === 'results' && renderResultsTab()}

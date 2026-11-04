@@ -1,15 +1,14 @@
 import * as React from 'react'
-import { Card, CardContent, Badge, cn } from '@/components/ui'
+import { BarChart3, Gamepad2, Settings, Users } from 'lucide-react'
+import { cn } from '@/components/ui'
 import { QuizMode } from '@/types/quiz'
-
-const { useState } = React
 
 export type HostDashboardTab = 'control' | 'participants' | 'results' | 'settings'
 
 interface TabInfo {
   id: HostDashboardTab
   label: string
-  icon: string
+  icon: React.ReactNode
   description: string
   modeRestrictions?: QuizMode[]
 }
@@ -17,26 +16,26 @@ interface TabInfo {
 const TAB_CONFIG: TabInfo[] = [
   {
     id: 'control',
-    label: 'Control Panel',
-    icon: '🎮',
+    label: 'Control',
+    icon: <Gamepad2 />,
     description: 'Quiz controls and management'
   },
   {
     id: 'participants',
     label: 'Participants',
-    icon: '👥',
+    icon: <Users />,
     description: 'Participant management and monitoring'
   },
   {
     id: 'results',
     label: 'Results',
-    icon: '📊',
+    icon: <BarChart3 />,
     description: 'Results, leaderboards, and analytics'
   },
   {
     id: 'settings',
     label: 'Settings',
-    icon: '⚙️',
+    icon: <Settings />,
     description: 'Quiz configuration and options'
   }
 ]
@@ -58,7 +57,7 @@ export function HostDashboardTabs({
   submissionCount = 0,
   className
 }: HostDashboardTabsProps) {
-  
+
   const getTabLabel = (tab: TabInfo) => {
     switch (tab.id) {
       case 'results':
@@ -91,54 +90,52 @@ export function HostDashboardTabs({
     return true
   }
 
+  const current = TAB_CONFIG.find(t => t.id === currentTab)
+
   return (
-    <Card className={cn('mb-6', className)}>
-      <CardContent className="p-0">
-        <div className="flex border-b border-border">
-          {TAB_CONFIG.filter(isTabAvailable).map((tab) => {
-            const isActive = currentTab === tab.id
-            const badge = getTabBadge(tab)
-            
-            return (
-              <button
-                key={tab.id}
-                onClick={() => onTabChange(tab.id)}
-                className={cn(
-                  'flex-1 flex items-center justify-center space-x-2 py-3 px-4',
-                  'text-sm font-medium transition-all duration-200',
-                  'border-b-2 border-transparent',
-                  'hover:bg-muted/50',
-                  isActive 
-                    ? 'border-primary bg-primary/5 text-primary' 
-                    : 'text-muted-foreground hover:text-foreground'
-                )}
-              >
-                <span className="text-base" role="img" aria-hidden="true">
-                  {tab.icon}
+    <div className={cn('mb-5', className)}>
+      <div role="tablist" aria-label="Host sections" className="flex gap-1 overflow-x-auto rounded-lg border border-border bg-surface-raised p-1">
+        {TAB_CONFIG.filter(isTabAvailable).map((tab) => {
+          const isActive = currentTab === tab.id
+          const badge = getTabBadge(tab)
+
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              role="tab"
+              aria-selected={isActive}
+              onClick={() => onTabChange(tab.id)}
+              className={cn(
+                'flex h-10 min-w-0 flex-1 items-center justify-center gap-2 rounded-md px-3 text-sm font-medium',
+                'transition-[background-color,color,box-shadow] duration-150 [&_svg]:size-4 [&_svg]:shrink-0',
+                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                isActive
+                  ? 'bg-card text-foreground shadow-card'
+                  : 'text-muted-foreground hover:text-foreground'
+              )}
+            >
+              {tab.icon}
+              <span className="hidden truncate sm:inline">{getTabLabel(tab)}</span>
+              {badge && (
+                <span
+                  className={cn(
+                    'inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[11px] font-semibold tabular',
+                    isActive ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
+                  )}
+                >
+                  {badge > 99 ? '99+' : badge}
                 </span>
-                <span className="hidden sm:inline">
-                  {getTabLabel(tab)}
-                </span>
-                {badge && (
-                  <Badge 
-                    variant={isActive ? "default" : "secondary"}
-                    className="ml-1 text-xs min-w-[20px] h-5"
-                  >
-                    {badge > 99 ? '99+' : badge}
-                  </Badge>
-                )}
-              </button>
-            )
-          })}
-        </div>
-        
-        {/* Tab description for mobile */}
-        <div className="sm:hidden p-3 bg-muted/30 border-b">
-          <p className="text-xs text-muted-foreground text-center">
-            {TAB_CONFIG.find(t => t.id === currentTab)?.description}
-          </p>
-        </div>
-      </CardContent>
-    </Card>
+              )}
+            </button>
+          )
+        })}
+      </div>
+
+      {/* Tab description for mobile */}
+      <p className="mt-2 text-center text-xs text-muted-foreground sm:hidden">
+        {current ? `${getTabLabel(current)} · ${current.description}` : ''}
+      </p>
+    </div>
   )
 }

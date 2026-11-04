@@ -1,19 +1,38 @@
-import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import type { Metadata, Viewport } from "next";
+import { Bricolage_Grotesque, DM_Sans } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { SessionProvider } from "@/contexts/SessionContext";
 
-const inter = Inter({
+const display = Bricolage_Grotesque({
   subsets: ["latin"],
-  variable: "--font-inter",
+  variable: "--font-display",
+  weight: ["500", "600", "700", "800"],
+});
+
+const body = DM_Sans({
+  subsets: ["latin"],
+  variable: "--font-body",
+  weight: ["400", "500", "600", "700"],
 });
 
 export const metadata: Metadata = {
-  title: "Quiz Buzzer - Real-time Quiz Application",
+  title: "Audience Voice - Live quizzes, buzzers and polls",
   description: "Interactive quiz application with real-time buzzer system for teams",
   keywords: ["quiz", "buzzer", "trivia", "real-time", "team", "competition"],
-  viewport: "width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "Audience Voice",
+  },
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  themeColor: "#0a0e1a",
 };
 
 export default function RootLayout({
@@ -22,15 +41,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="h-full dark">
-      <head>
-        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-        <meta name="theme-color" content="#1e1b4b" />
-        <meta name="apple-mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-        <meta name="apple-mobile-web-app-title" content="Quiz Buzzer" />
-      </head>
-      <body className={`${inter.variable} font-sans antialiased h-full`}>
+    <html lang="en" className={`h-full dark ${display.variable} ${body.variable}`}>
+      <body className="font-sans antialiased h-full">
         <AuthProvider>
           <SessionProvider>
             {children}

@@ -1,6 +1,8 @@
 import React from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
+import { BarChart3, Crown, Lock, Users } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
+import { StatTile } from '@/components/ui/StatTile';
 import { PollResults as PollResultsType } from '@/types/polling';
 import { getOptionLabel, cn } from '@/lib/utils';
 
@@ -22,7 +24,7 @@ export function PollResults({
   if (!results) {
     return (
       <Card className={cn('w-full', className)}>
-        <CardContent className="p-8 text-center text-gray-500 dark:text-gray-400">
+        <CardContent className="p-8 text-center text-sm text-muted-foreground">
           No poll results available
         </CardContent>
       </Card>
@@ -36,46 +38,25 @@ export function PollResults({
     return totalVotes > 0 ? Math.round((votes / totalVotes) * 100) : 0;
   };
 
-  const getBarColor = (votes: number, index: number): string => {
-    if (votes === maxVotes && maxVotes > 0) {
-      return 'bg-gradient-to-r from-green-500 to-green-600'; // Winner
-    }
-    const colors = [
-      'bg-gradient-to-r from-blue-500 to-blue-600',
-      'bg-gradient-to-r from-purple-500 to-purple-600',
-      'bg-gradient-to-r from-pink-500 to-pink-600',
-      'bg-gradient-to-r from-indigo-500 to-indigo-600',
-      'bg-gradient-to-r from-cyan-500 to-cyan-600',
-      'bg-gradient-to-r from-amber-500 to-amber-600',
-    ];
-    return colors[index % colors.length];
-  };
-
   return (
-    <Card className={cn('w-full bg-gradient-to-br from-slate-50 to-slate-100 dark:from-dark-800 dark:to-dark-700', className)}>
+    <Card className={cn('w-full', className)}>
       <CardHeader>
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-slate-700 dark:text-gray-100 flex items-center space-x-2">
-            <span>📊</span>
-            <span>Poll Results</span>
-          </CardTitle>
-          <div className="flex items-center space-x-2">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              <BarChart3 className="h-4 w-4 text-primary" /> Live results
+            </CardTitle>
+            <CardDescription className="tabular">{totalVotes} response{totalVotes === 1 ? '' : 's'} so far</CardDescription>
+          </div>
+          <div className="flex items-center gap-2">
             {onToggleResults && (
-              <Button
-                onClick={onToggleResults}
-                size="sm"
-                variant="outline"
-              >
-                👥 {showParticipants ? 'Hide' : 'Show'} Voters
+              <Button onClick={onToggleResults} size="sm" variant="outline">
+                <Users /> {showParticipants ? 'Hide' : 'Show'} voters
               </Button>
             )}
             {onClosePoll && (
-              <Button
-                onClick={onClosePoll}
-                size="sm"
-                variant="destructive"
-              >
-                🔒 Close Poll
+              <Button onClick={onClosePoll} size="sm" variant="destructive">
+                <Lock /> Close poll
               </Button>
             )}
           </div>
@@ -83,17 +64,12 @@ export function PollResults({
       </CardHeader>
       <CardContent className="space-y-6">
         {/* Question */}
-        <div className="bg-white dark:bg-dark-700 rounded-lg p-6 shadow-sm border dark:border-dark-600">
-          <h3 className="text-xl font-semibold text-slate-900 dark:text-gray-100 leading-relaxed mb-2">
-            {question}
-          </h3>
-          <div className="text-sm text-slate-600 dark:text-gray-400">
-            Total responses: <span className="font-semibold">{totalVotes}</span>
-          </div>
-        </div>
+        <h3 className="font-display text-xl font-semibold leading-snug text-foreground sm:text-2xl">
+          {question}
+        </h3>
 
         {/* Results */}
-        <div className="space-y-4">
+        <ol className="space-y-3">
           {options.map((option, index) => {
             const votes = voteCounts[index] || 0;
             const percentage = getPercentage(votes);
@@ -101,67 +77,54 @@ export function PollResults({
             const voters = voterNames[index] || [];
 
             return (
-              <div
+              <li
                 key={index}
                 className={cn(
-                  'bg-white dark:bg-dark-700 rounded-lg p-4 border dark:border-dark-600 transition-all duration-200',
-                  isWinner && 'border-green-300 dark:border-green-500 shadow-lg ring-2 ring-green-100 dark:ring-green-900/30'
+                  'relative overflow-hidden rounded-lg border p-3.5 transition-colors',
+                  isWinner ? 'border-primary/50 bg-primary/5' : 'border-border bg-surface'
                 )}
               >
-                {/* Option Header */}
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center space-x-3">
+                <div className="mb-2.5 flex items-center justify-between gap-3">
+                  <div className="flex min-w-0 items-center gap-3">
                     <span
                       className={cn(
-                        'flex items-center justify-center w-8 h-8 rounded-full',
-                        'bg-slate-100 dark:bg-dark-600 text-slate-700 dark:text-gray-200 font-semibold text-sm',
-                        isWinner && 'bg-green-200 dark:bg-green-800 text-green-800 dark:text-green-200'
+                        'flex h-8 w-8 shrink-0 items-center justify-center rounded-md font-display text-sm font-bold',
+                        isWinner ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
                       )}
                     >
                       {getOptionLabel(index)}
-                      {isWinner && ' 👑'}
                     </span>
-                    <span
-                      className={cn(
-                        'text-slate-800 dark:text-gray-200 font-medium',
-                        isWinner && 'text-green-800 dark:text-green-200 font-semibold'
-                      )}
-                    >
+                    <span className={cn('truncate text-sm sm:text-[15px]', isWinner ? 'font-semibold text-foreground' : 'text-foreground/90')}>
                       {option}
                     </span>
+                    {isWinner && <Crown className="h-4 w-4 shrink-0 text-primary" aria-label="Leading option" />}
                   </div>
-                  <div className="flex items-center space-x-3">
-                    <span className="text-lg font-bold text-slate-700 dark:text-gray-200">
-                      {votes}
-                    </span>
-                    <span className="text-sm text-slate-500 dark:text-gray-400 min-w-[3rem] text-right">
-                      {percentage}%
-                    </span>
+                  <div className="flex shrink-0 items-baseline gap-1.5 tabular">
+                    <span className="font-display text-lg font-bold text-foreground">{votes}</span>
+                    <span className="w-10 text-right text-xs text-muted-foreground">{percentage}%</span>
                   </div>
                 </div>
 
                 {/* Progress Bar */}
-                <div className="w-full bg-slate-200 dark:bg-dark-600 rounded-full h-3 mb-3">
+                <div className="h-2.5 w-full overflow-hidden rounded-full bg-muted">
                   <div
                     className={cn(
-                      'h-3 rounded-full transition-all duration-1000 ease-out',
-                      getBarColor(votes, index)
+                      'h-full origin-left rounded-full transition-transform duration-700 ease-out',
+                      isWinner ? 'bg-primary' : 'bg-info'
                     )}
-                    style={{ width: `${percentage}%` }}
+                    style={{ transform: `scaleX(${percentage / 100})` }}
                   />
                 </div>
 
                 {/* Voter Names */}
                 {showParticipants && voters.length > 0 && (
-                  <div className="border-t pt-3">
-                    <div className="text-xs text-slate-600 dark:text-gray-400 mb-2">
-                      Voted by: ({voters.length})
-                    </div>
-                    <div className="flex flex-wrap gap-1">
+                  <div className="mt-3 border-t border-border pt-3">
+                    <p className="eyebrow mb-2">Voted by ({voters.length})</p>
+                    <div className="flex flex-wrap gap-1.5">
                       {voters.map((voterName, voterIndex) => (
                         <span
                           key={voterIndex}
-                          className="text-xs bg-slate-100 dark:bg-dark-600 text-slate-700 dark:text-gray-200 px-2 py-1 rounded-full"
+                          className="rounded-full border border-border bg-surface-raised px-2 py-0.5 text-xs text-foreground"
                         >
                           {voterName}
                         </span>
@@ -169,36 +132,18 @@ export function PollResults({
                     </div>
                   </div>
                 )}
-              </div>
+              </li>
             );
           })}
-        </div>
+        </ol>
 
         {/* Summary Stats */}
         {totalVotes > 0 && (
-          <div className="bg-slate-100 dark:bg-dark-700 rounded-lg p-4">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
-              <div>
-                <div className="text-2xl font-bold text-slate-800 dark:text-gray-100">{totalVotes}</div>
-                <div className="text-sm text-slate-600 dark:text-gray-400">Total Votes</div>
-              </div>
-              <div>
-                <div className="text-2xl font-bold text-slate-800 dark:text-gray-100">{options.length}</div>
-                <div className="text-sm text-slate-600 dark:text-gray-400">Options</div>
-              </div>
-              <div>
-                <div className="text-2xl font-bold text-green-600 dark:text-green-400">
-                  {Math.max(...voteCounts)}
-                </div>
-                <div className="text-sm text-slate-600 dark:text-gray-400">Top Votes</div>
-              </div>
-              <div>
-                <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-                  {Math.round((Math.max(...voteCounts) / totalVotes) * 100)}%
-                </div>
-                <div className="text-sm text-slate-600 dark:text-gray-400">Winner Share</div>
-              </div>
-            </div>
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+            <StatTile label="Total votes" value={totalVotes} />
+            <StatTile label="Options" value={options.length} />
+            <StatTile label="Top votes" value={Math.max(...voteCounts)} tone="primary" />
+            <StatTile label="Leader share" value={`${Math.round((Math.max(...voteCounts) / totalVotes) * 100)}%`} tone="info" />
           </div>
         )}
       </CardContent>

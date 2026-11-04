@@ -1,17 +1,21 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from './Card';
+import { Check, Copy, Link2, QrCode } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './Card';
 import { Button } from './Button';
+import { SegmentedControl } from './SegmentedControl';
+import { cn } from '@/lib/utils';
 import QRCode from 'qrcode';
 
 interface SharePanelProps {
   joinPath: string;
   title: string;
   description: string;
+  className?: string;
 }
 
-export function SharePanel({ joinPath, title, description }: SharePanelProps) {
+export function SharePanel({ joinPath, title, description, className }: SharePanelProps) {
   const [activeTab, setActiveTab] = useState<'qr' | 'link'>('qr');
   const [qrCodeUrl, setQrCodeUrl] = useState<string>('');
   const [joinUrl, setJoinUrl] = useState<string>('');
@@ -22,13 +26,13 @@ export function SharePanel({ joinPath, title, description }: SharePanelProps) {
       const fullUrl = `${window.location.origin}${joinPath}`;
       setJoinUrl(fullUrl);
 
-      // Generate QR Code
+      // Generate QR Code (dark modules on white so any phone camera reads it)
       QRCode.toDataURL(fullUrl, {
-        width: 200,
-        margin: 2,
+        width: 320,
+        margin: 1,
         color: {
-          dark: '#ffffff',
-          light: '#000000'
+          dark: '#0a0e1a',
+          light: '#ffffff'
         }
       }).then(url => {
         setQrCodeUrl(url);
@@ -46,68 +50,66 @@ export function SharePanel({ joinPath, title, description }: SharePanelProps) {
     }
   };
 
+  const sessionCode = (() => {
+    try {
+      const url = new URL(joinUrl);
+      return url.searchParams.get('session');
+    } catch {
+      return null;
+    }
+  })();
+
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-gray-900 dark:text-gray-100 text-lg">{title}</CardTitle>
-        <p className="text-gray-600 dark:text-gray-400 text-sm">{description}</p>
+    <Card className={cn(className)}>
+      <CardHeader className="pb-4">
+        <CardTitle>{title}</CardTitle>
+        <CardDescription>{description}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* Tabs */}
-        <div className="flex space-x-1 bg-gray-100 dark:bg-dark-700 rounded-lg p-1">
-          <button
-            onClick={() => setActiveTab('qr')}
-            className={`flex-1 py-2 px-3 rounded-md text-sm font-medium transition-colors ${
-              activeTab === 'qr'
-                ? 'bg-white dark:bg-dark-600 text-gray-900 dark:text-gray-100 shadow-sm'
-                : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100'
-            }`}
-          >
-            QR Code
-          </button>
-          <button
-            onClick={() => setActiveTab('link')}
-            className={`flex-1 py-2 px-3 rounded-md text-sm font-medium transition-colors ${
-              activeTab === 'link'
-                ? 'bg-white dark:bg-dark-600 text-gray-900 dark:text-gray-100 shadow-sm'
-                : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100'
-            }`}
-          >
-            Link
-          </button>
-        </div>
+        <SegmentedControl
+          value={activeTab}
+          onChange={setActiveTab}
+          size="sm"
+          aria-label="Share method"
+          options={[
+            { value: 'qr', label: 'QR code', icon: <QrCode /> },
+            { value: 'link', label: 'Link', icon: <Link2 /> },
+          ]}
+        />
 
-        {/* QR Code Tab */}
         {activeTab === 'qr' && (
-          <div className="text-center space-y-4">
-            {qrCodeUrl && (
-              <div className="bg-white dark:bg-gray-100 border border-gray-200 dark:border-dark-600 rounded-lg p-4 inline-block">
-                <img src={qrCodeUrl} alt="QR Code" className="w-40 h-40" />
-              </div>
-            )}
-            <p className="text-gray-600 dark:text-gray-400 text-sm">
-              Participants can scan this QR code to join instantly
-            </p>
+          <div className="flex flex-col items-center gap-3 text-center">
+            <div className="rounded-xl border border-border bg-white p-3 shadow-card">
+              {qrCodeUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={qrCodeUrl} alt="QR code to join" className="h-40 w-40" width={160} height={160} />
+              ) : (
+                <div className="h-40 w-40 animate-pulse rounded-md bg-muted" />
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground">Point a phone camera at the code to join instantly.</p>
           </div>
         )}
 
-        {/* Link Tab */}
         {activeTab === 'link' && (
-          <div className="space-y-4">
-            <div className="bg-gray-50 dark:bg-dark-700 border border-gray-200 dark:border-dark-600 rounded-lg p-3">
-              <p className="text-gray-500 dark:text-gray-400 text-xs mb-2">Join Link:</p>
-              <code className="text-gray-800 dark:text-gray-200 text-sm break-all font-mono">{joinUrl}</code>
+          <div className="space-y-3">
+            <div className="rounded-lg border border-border bg-surface-raised p-3">
+              <p className="eyebrow mb-1.5">Join link</p>
+              <code className="block break-all font-mono text-xs leading-relaxed text-foreground">{joinUrl || '…'}</code>
             </div>
-            <Button
-              onClick={copyToClipboard}
-              variant="outline"
-              className="w-full"
-            >
-              {copied ? 'Copied!' : 'Copy Link'}
+            <Button onClick={copyToClipboard} variant={copied ? 'success' : 'outline'} className="w-full" disabled={!joinUrl}>
+              {copied ? <Check /> : <Copy />}
+              {copied ? 'Copied' : 'Copy link'}
             </Button>
-            <p className="text-gray-600 dark:text-gray-400 text-sm text-center">
-              Share this link with participants to let them join
-            </p>
+          </div>
+        )}
+
+        {sessionCode && (
+          <div className="flex items-center justify-between rounded-lg border border-dashed border-border px-3 py-2">
+            <span className="eyebrow">Session</span>
+            <code className="font-mono text-xs text-muted-foreground truncate max-w-[60%]" title={sessionCode}>
+              {sessionCode}
+            </code>
           </div>
         )}
       </CardContent>

@@ -1,6 +1,8 @@
 import React from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
+import { Eye, EyeOff, Lock, SlidersHorizontal } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
+import { Badge } from '@/components/ui/badge';
 import { Poll } from '@/types/polling';
 import { cn } from '@/lib/utils';
 
@@ -28,62 +30,47 @@ export function PollControls({
 
   return (
     <Card className={cn('w-full', className)}>
-      <CardHeader>
-        <CardTitle className="text-gray-900 dark:text-gray-100 text-lg">
-          Poll Controls
+      <CardHeader className="pb-3">
+        <CardTitle className="flex items-center gap-2">
+          <SlidersHorizontal className="h-4 w-4 text-primary" /> Poll controls
         </CardTitle>
+        <CardDescription>
+          {hasActivePoll ? 'Accepting votes' : hasPoll ? 'Poll closed' : 'No poll running'}
+        </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-6">
+      <CardContent className="space-y-5">
         {/* Total Votes Display */}
         {hasPoll && (
-          <div className="bg-gray-50 dark:bg-dark-700 rounded-lg p-6 border border-gray-200 dark:border-dark-600 text-center">
-            <div className="text-4xl font-bold text-gray-900 dark:text-gray-100 mb-2">{totalVotes}</div>
-            <div className="text-sm text-gray-600 dark:text-gray-400 font-medium">Total Votes</div>
+          <div className="rounded-xl border border-border bg-surface-raised p-5 text-center">
+            <p className="eyebrow">Total votes</p>
+            <p className="mt-1 font-display text-4xl font-bold tabular text-foreground">{totalVotes}</p>
+            <Badge variant={hasActivePoll ? 'live' : 'secondary'} className="mt-3">
+              {hasActivePoll ? 'Live' : 'Closed'}
+            </Badge>
           </div>
         )}
 
         {/* Action Buttons */}
-        <div className="space-y-3">
+        <div className="space-y-2">
           {/* Results Toggle */}
           {hasPoll && (
             <Button
               onClick={onToggleResults}
               className="w-full"
-              variant={showResults ? "default" : "outline"}
+              variant={showResults ? 'default' : 'outline'}
             >
-              {showResults ? (
-                <>📊 Hide Live Results</>
-              ) : (
-                <>👁️ Show Live Results</>
-              )}
+              {showResults ? <EyeOff /> : <Eye />}
+              {showResults ? 'Hide live results' : 'Show live results'}
             </Button>
           )}
 
           {/* Close Poll */}
           {hasActivePoll && (
-            <Button
-              onClick={onClosePoll}
-              className="w-full bg-red-600 hover:bg-red-700"
-              variant="destructive"
-            >
-              🔒 Close Current Poll
+            <Button onClick={onClosePoll} className="w-full" variant="destructive">
+              <Lock /> Close current poll
             </Button>
           )}
-
-
-          {/* Commented out for now - can bring back later */}
-          {/* {hasActivePoll && (
-            <Button
-              onClick={onNewPoll}
-              className="w-full bg-purple-600 hover:bg-purple-700"
-              disabled={false}
-            >
-              ⏳ Close current poll to create new one
-            </Button>
-          )} */}
         </div>
-
-
       </CardContent>
     </Card>
   );

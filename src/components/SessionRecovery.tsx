@@ -1,8 +1,10 @@
 'use client';
 
 import React from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
+import { History } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
+import { Spinner } from '@/components/ui/Spinner';
 import { useSession, useSessionStatus } from '@/contexts/SessionContext';
 
 interface SessionRecoveryProps {
@@ -29,75 +31,43 @@ export function SessionRecovery({ onSkipRecovery, onRetryRecovery }: SessionReco
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <Card className="w-full max-w-md mx-4">
-        <CardHeader className="text-center">
-          <CardTitle className="flex items-center justify-center gap-2">
-            {isRecovering ? (
-              <>
-                <div className="animate-spin h-4 w-4 border-2 border-blue-600 border-t-transparent rounded-full" />
-                Restoring Session...
-              </>
-            ) : error ? (
-              "Session Recovery Failed"
-            ) : (
-              "Session Found"
-            )}
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/70 px-4 backdrop-blur-sm">
+      <Card className="w-full max-w-md shadow-raised animate-fade-up">
+        <CardHeader className="items-center text-center">
+          <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-xl bg-primary/15 text-primary">
+            {isRecovering ? <Spinner size="md" /> : <History className="h-5 w-5" />}
+          </div>
+          <CardTitle>
+            {isRecovering ? 'Restoring session' : error ? 'Could not restore session' : 'Session found'}
           </CardTitle>
+          <CardDescription>
+            {isRecovering && 'We found your previous session and are restoring your progress.'}
+            {!isRecovering && error && 'The session may have expired or the quiz may have ended.'}
+            {!isRecovering && hasStoredSession && !error && 'Pick up where you left off, or start fresh.'}
+          </CardDescription>
         </CardHeader>
-        
-        <CardContent className="text-center space-y-4">
-          {isRecovering && (
-            <p className="text-gray-600 dark:text-gray-400">
-              We found your previous session and are restoring your progress...
-            </p>
-          )}
-          
-          {error && (
-            <div className="space-y-2">
-              <p className="text-red-600 dark:text-red-400">
-                {error}
-              </p>
-              <p className="text-sm text-gray-600 dark:text-gray-400">
-                The session may have expired or the quiz may have ended.
-              </p>
-            </div>
-          )}
-          
-          {!isRecovering && hasStoredSession && !error && (
-            <p className="text-gray-600 dark:text-gray-400">
-              We found your previous session. Would you like to continue where you left off?
-            </p>
-          )}
-          
+
+        <CardContent className="space-y-4 text-center">
+          {error && <p className="text-sm text-destructive">{error}</p>}
+
           {!isRecovering && (
-            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+            <div className="flex flex-col justify-center gap-3 sm:flex-row">
               {error ? (
                 <>
-                  <Button onClick={handleRetry} variant="outline">
-                    Try Again
-                  </Button>
-                  <Button onClick={handleSkip}>
-                    Start New Session
-                  </Button>
+                  <Button onClick={handleRetry} variant="outline">Try again</Button>
+                  <Button onClick={handleSkip}>Start new session</Button>
                 </>
               ) : (
                 <>
-                  <Button onClick={attemptAutoRecovery}>
-                    Continue Session
-                  </Button>
-                  <Button onClick={handleSkip} variant="outline">
-                    Start Fresh
-                  </Button>
+                  <Button onClick={attemptAutoRecovery}>Continue session</Button>
+                  <Button onClick={handleSkip} variant="outline">Start fresh</Button>
                 </>
               )}
             </div>
           )}
-          
+
           {isRecovering && (
-            <p className="text-xs text-gray-500 dark:text-gray-500">
-              This should only take a moment...
-            </p>
+            <p className="text-xs text-muted-foreground">This should only take a moment.</p>
           )}
         </CardContent>
       </Card>
@@ -108,16 +78,13 @@ export function SessionRecovery({ onSkipRecovery, onRetryRecovery }: SessionReco
 // Simple loading overlay for when recovery is happening
 export function SessionRecoveryOverlay() {
   const { isRecovering } = useSessionStatus();
-  
+
   if (!isRecovering) return null;
-  
+
   return (
-    <div className="fixed inset-0 bg-black/20 flex items-center justify-center z-40">
-      <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-lg">
-        <div className="flex items-center gap-3">
-          <div className="animate-spin h-5 w-5 border-2 border-blue-600 border-t-transparent rounded-full" />
-          <span className="text-sm font-medium">Restoring your session...</span>
-        </div>
+    <div className="fixed inset-0 z-40 flex items-center justify-center bg-background/50 backdrop-blur-sm">
+      <div className="rounded-xl border border-border bg-card p-5 shadow-raised">
+        <Spinner size="sm" label="Restoring your session..." />
       </div>
     </div>
   );

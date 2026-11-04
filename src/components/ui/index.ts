@@ -2,15 +2,17 @@
 
 // Core Components
 export { Button, buttonVariants, type ButtonProps } from './Button'
-export { 
-  Card, 
-  CardHeader, 
-  CardFooter, 
-  CardTitle, 
-  CardDescription, 
-  CardContent 
+export {
+  Card,
+  CardHeader,
+  CardFooter,
+  CardTitle,
+  CardDescription,
+  CardContent
 } from './Card'
 export { Input, type InputProps } from './Input'
+export { Textarea, type TextareaProps } from './textarea'
+export { NativeSelect, type NativeSelectProps } from './select'
 export { Label } from './label'
 
 // Layout & Navigation
@@ -26,6 +28,7 @@ export {
   DialogTitle,
   DialogDescription,
 } from './dialog'
+export { SegmentedControl, type SegmentedOption } from './SegmentedControl'
 
 // Feedback Components
 export {
@@ -42,6 +45,10 @@ export {
 export { Alert, AlertTitle, AlertDescription } from './alert'
 export { Badge, badgeVariants, type BadgeProps } from './badge'
 export { Toaster } from './toaster'
+export { Spinner, LoadingScreen } from './Spinner'
+export { EmptyState } from './EmptyState'
+export { StatTile } from './StatTile'
+export { Progress } from './Progress'
 
 // Layout Components
 export { Separator } from './separator'

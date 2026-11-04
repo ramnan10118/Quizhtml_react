@@ -2,12 +2,17 @@
 
 import React, { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { Hash, ListChecks, LogOut, Radio, Users, Zap } from 'lucide-react';
 import { Header } from '@/components/layout/Header';
+import { ConnectionStatus } from '@/components/layout/ConnectionStatus';
 import { QuestionDisplay } from '@/components/quiz/QuestionDisplay';
 import { ScoreBoard } from '@/components/quiz/ScoreBoard';
 import { ParticipantList } from '@/components/quiz/ParticipantList';
 import { SharePanel } from '@/components/ui/SharePanel';
 import { Button } from '@/components/ui/Button';
+import { Badge } from '@/components/ui/badge';
+import { Spinner } from '@/components/ui/Spinner';
+import { Card, CardContent } from '@/components/ui/Card';
 import { ModeAwareHostDashboard } from '@/components/host/ModeAwareHostDashboard';
 import { useSocket } from '@/hooks/useSocket';
 import { useQuizState } from '@/hooks/useQuizState';
@@ -17,8 +22,8 @@ import { liveQuizzes, LiveQuiz } from '@/lib/drafts';
 function HostPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { socket } = useSocket();
-  
+  const { socket, connectionStatus } = useSocket();
+
   // Debug session ID changes - moved after currentSessionId declaration
   const {
     quizState,
@@ -341,7 +346,9 @@ function HostPageContent() {
     });
 
     // Basic mode events
-    socket.on('basic-quiz-submitted', (submission: ParticipantSubmission) => {
+    socket.on('basic-quiz-submitted', (data) => {
+      // Server sends the host a bare submission; the submitter gets { submission, ... }.
+      const submission: ParticipantSubmission = 'submission' in data ? data.submission : data;
       console.log('Basic quiz submission received:', submission);
       setBasicSubmissions(prev => [...prev, submission]);
     });
@@ -643,90 +650,124 @@ function HostPageContent() {
     score
   }));
 
+  // ---- Presentation-only derived values ----
+  const modeLabel = currentMode === 'buzzer' ? 'Buzzer' : currentMode === 'basic' ? 'Self-paced' : 'Scheduled reveal';
+  const joinPath = currentSessionId ? `/quiz/join?session=${currentSessionId}` : (searchParams.get('live') ? `/quiz/join?session=${searchParams.get('live')}` : "/quiz/join");
+  const sessionLabel = currentSessionId ?? searchParams.get('live') ?? null;
+  const statusChip = (icon: React.ReactNode, label: React.ReactNode, title?: string) => (
+    <span
+      title={title}
+      className="inline-flex h-8 max-w-full items-center gap-1.5 rounded-full border border-border bg-card px-3 text-xs font-medium text-muted-foreground [&_svg]:size-3.5 [&_svg]:shrink-0"
+    >
+      {icon}
+      <span className="truncate text-foreground">{label}</span>
+    </span>
+  );
+
   return (
-    <div className="min-h-screen flex flex-col bg-gray-50 dark:bg-dark-900 dark">
-      <Header 
-        title={`${currentMode.charAt(0).toUpperCase() + currentMode.slice(1)} Quiz Host`}
-        subtitle={currentMode === 'buzzer' 
-          ? `Question ${quizState.currentQuestion} of ${quizState.totalQuestions}` 
-          : `${questions.length} questions • ${participantCount} participants`
+    <div className="app-bg flex min-h-screen flex-col">
+      <Header
+        title={currentLiveQuiz?.title ? currentLiveQuiz.title : `${modeLabel} quiz · host`}
+        subtitle={currentMode === 'buzzer'
+          ? `Question ${quizState.currentQuestion} of ${quizState.totalQuestions}`
+          : `${questions.length} questions · ${participantCount} participants`
         }
       >
-        <div className="flex items-center space-x-4">
-          <Button
-            onClick={handleExitQuiz}
-            variant="destructive"
-            size="sm"
-          >
-            Exit Quiz
-          </Button>
-        </div>
+        <ConnectionStatus status={connectionStatus} compact />
+        <Button onClick={handleExitQuiz} variant="destructive" size="sm" aria-label="Exit quiz">
+          <LogOut /> <span className="hidden sm:inline">Exit quiz</span>
+        </Button>
       </Header>
 
-      <main className="flex-1 p-6 bg-gray-50 dark:bg-dark-900">
-        <div className="max-w-7xl mx-auto">
-          {loadingLiveQuiz ? (
-            <div className="flex items-center justify-center py-12">
-              <div className="text-center">
-                <div className="animate-spin text-4xl mb-4">🔄</div>
-                <p className="text-gray-600 dark:text-gray-400">Loading live quiz...</p>
-              </div>
-            </div>
-          ) : currentMode === 'buzzer' ? (
-            // Original buzzer interface for backward compatibility
-            <div className="grid lg:grid-cols-3 gap-6">
-              <div className="lg:col-span-2">
-                <QuestionDisplay
-                  questionNumber={quizState.currentQuestion}
-                  totalQuestions={quizState.totalQuestions}
-                  question={quizState.currentQuestionData}
-                  isHost={true}
-                  revealedAnswer={revealedAnswer}
-                  highlightedOption={highlightedOption}
-                  onQuestionChange={handleQuestionChange}
-                  onRevealAnswer={handleRevealAnswer}
-                />
-              </div>
-              <div className="space-y-6">
-                <ScoreBoard scores={quizState.scores} />
-                <ParticipantList 
-                  rankings={quizState.rankings}
-                  onAddPoint={handleAddPoint}
-                  onResetBuzzer={handleResetBuzzer}
-                />
-                <SharePanel
-                  joinPath={currentSessionId ? `/quiz/join?session=${currentSessionId}` : (searchParams.get('live') ? `/quiz/join?session=${searchParams.get('live')}` : "/quiz/join")}
-                  title="Invite Players"
-                  description="Share with participants to join the quiz"
-                />
-              </div>
-            </div>
-          ) : (
-            // New mode-aware dashboard for basic and scheduled modes
-            <ModeAwareHostDashboard
-              mode={currentMode}
-              settings={currentSettings}
-              questions={questions}
-              basicSubmissions={basicSubmissions}
-              scheduledSubmissions={scheduledSubmissions}
-              revealedQuestions={revealedQuestions}
-              leaderboard={leaderboard}
-              leaderboardVisible={leaderboardVisible}
-              participants={participants}
-              scores={teamScores}
-              participantCount={participantCount}
-              submissionCount={submissionCount}
-              currentSessionId={currentSessionId}
-              searchParams={searchParams}
-              onSettingsUpdate={handleSettingsUpdate}
-              onRevealQuestion={handleRevealQuestion}
-              onRevealAll={handleRevealAll}
-              onToggleLeaderboardVisibility={handleToggleLeaderboardVisibility}
-              onSendAnnouncement={handleSendAnnouncement}
-              onRefreshData={handleRefreshData}
-            />
-          )}
+      <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-5 sm:px-6 sm:py-6">
+        {/* Session status strip */}
+        <div className="mb-5 flex flex-wrap items-center gap-2">
+          <Badge variant="live" className="h-8 px-3">Live session</Badge>
+          {statusChip(<Zap />, modeLabel, 'Quiz mode')}
+          {sessionLabel && statusChip(<Hash />, sessionLabel, 'Session ID')}
+          {statusChip(<Users />, `${participantCount} participant${participantCount === 1 ? '' : 's'}`)}
+          {currentMode === 'buzzer'
+            ? statusChip(<ListChecks />, `Question ${quizState.currentQuestion} / ${quizState.totalQuestions}`)
+            : statusChip(<ListChecks />, `${submissionCount} submission${submissionCount === 1 ? '' : 's'}`)}
         </div>
+
+        {loadingLiveQuiz ? (
+          <div className="flex items-center justify-center py-16">
+            <Spinner size="lg" label="Loading live quiz..." className="flex-col gap-3" />
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
+            {/* Stage / dashboard */}
+            <div className="space-y-6 lg:col-span-8">
+              {currentMode === 'buzzer' ? (
+                // Original buzzer interface for backward compatibility
+                <>
+                  <QuestionDisplay
+                    questionNumber={quizState.currentQuestion}
+                    totalQuestions={quizState.totalQuestions}
+                    question={quizState.currentQuestionData}
+                    isHost={true}
+                    revealedAnswer={revealedAnswer}
+                    highlightedOption={highlightedOption}
+                    onQuestionChange={handleQuestionChange}
+                    onRevealAnswer={handleRevealAnswer}
+                  />
+                  <ParticipantList
+                    rankings={quizState.rankings}
+                    onAddPoint={handleAddPoint}
+                    onResetBuzzer={handleResetBuzzer}
+                  />
+                </>
+              ) : (
+                // New mode-aware dashboard for basic and scheduled modes
+                <ModeAwareHostDashboard
+                  mode={currentMode}
+                  settings={currentSettings}
+                  questions={questions}
+                  basicSubmissions={basicSubmissions}
+                  scheduledSubmissions={scheduledSubmissions}
+                  revealedQuestions={revealedQuestions}
+                  leaderboard={leaderboard}
+                  leaderboardVisible={leaderboardVisible}
+                  participants={participants}
+                  scores={teamScores}
+                  participantCount={participantCount}
+                  submissionCount={submissionCount}
+                  currentSessionId={currentSessionId}
+                  searchParams={searchParams}
+                  onSettingsUpdate={handleSettingsUpdate}
+                  onRevealQuestion={handleRevealQuestion}
+                  onRevealAll={handleRevealAll}
+                  onToggleLeaderboardVisibility={handleToggleLeaderboardVisibility}
+                  onSendAnnouncement={handleSendAnnouncement}
+                  onRefreshData={handleRefreshData}
+                />
+              )}
+            </div>
+
+            {/* Right rail: scores + invite */}
+            <aside className="space-y-6 lg:col-span-4">
+              {currentMode === 'buzzer' && <ScoreBoard scores={quizState.scores} />}
+              <SharePanel
+                joinPath={joinPath}
+                title="Invite participants"
+                description="Scan the code or share the link to join this session."
+              />
+              {currentMode !== 'buzzer' && (
+                <Card>
+                  <CardContent className="p-4">
+                    <p className="eyebrow mb-2 flex items-center gap-1.5"><Radio className="h-3.5 w-3.5" /> How this mode works</p>
+                    <p className="text-sm text-muted-foreground">
+                      {currentMode === 'basic'
+                        ? 'Participants answer every question at their own pace and submit once. Results arrive here as they finish.'
+                        : 'Participants submit all answers first. Use the Control tab to reveal questions one at a time, in batches, or all at once.'}
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
+            </aside>
+          </div>
+        )}
       </main>
     </div>
   );
