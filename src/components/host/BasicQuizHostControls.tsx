@@ -26,12 +26,15 @@ export function BasicQuizHostControls({
   const completedSubmissions = submissions.filter(s => s.isComplete)
   const inProgressCount = participantCount - completedSubmissions.length
 
+  const pct = (s: ParticipantSubmission) =>
+    s.percentage ?? (s.answers.length > 0 ? Math.round(((s.score || 0) / s.answers.length) * 100) : 0)
+
   const averageScore = completedSubmissions.length > 0
-    ? Math.round(completedSubmissions.reduce((sum, s) => sum + (s.score || 0), 0) / completedSubmissions.length)
+    ? Math.round(completedSubmissions.reduce((sum, s) => sum + pct(s), 0) / completedSubmissions.length)
     : 0
 
   const passedCount = settings.passingScore
-    ? completedSubmissions.filter(s => ((s.score || 0) / submissions[0]?.answers.length || 1) * 100 >= settings.passingScore!).length
+    ? completedSubmissions.filter(s => s.passed ?? pct(s) >= settings.passingScore!).length
     : 0
 
   const joinLink = typeof window !== 'undefined' ? window.location.href.replace('/host', '/join') : ''
@@ -168,8 +171,8 @@ export function BasicQuizHostControls({
                 .map((submission, index) => {
                   const score = submission.score || 0
                   const totalQuestions = submission.answers.length
-                  const percentage = Math.round((score / totalQuestions) * 100)
-                  const isPassed = settings.passingScore ? percentage >= settings.passingScore : true
+                  const percentage = pct(submission)
+                  const isPassed = submission.passed ?? (settings.passingScore ? percentage >= settings.passingScore : true)
 
                   return (
                     <li key={index} className="flex items-center justify-between gap-3 py-3 first:pt-0 last:pb-0">

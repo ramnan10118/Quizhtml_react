@@ -26,7 +26,11 @@ const MODE_LABELS: Record<'buzzer' | 'basic' | 'scheduled', string> = {
 function QuizSetupContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { user } = useAuth();
+  const { user, session } = useAuth();
+  const authHeaders = (): Record<string, string> => ({
+    'Content-Type': 'application/json',
+    ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {})
+  });
 
   const [questions, setQuestions] = useState<QuizQuestion[]>([]);
   const [currentDraft, setCurrentDraft] = useState<string | null>(null);
@@ -160,7 +164,7 @@ function QuizSetupContent() {
     try {
       const response = await fetch('/api/generate-questions', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders(),
         body: JSON.stringify({ topic: topic.trim(), difficulty, questionCount })
       });
 
@@ -197,7 +201,7 @@ function QuizSetupContent() {
     try {
       const response = await fetch('/api/enhance-question', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders(),
         body: JSON.stringify({
           question: manualQuestion,
           enhancementType: 'clarity'

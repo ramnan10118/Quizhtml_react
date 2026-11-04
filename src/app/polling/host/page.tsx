@@ -361,6 +361,15 @@ function PollingHostContent() {
     setPollData(null); // Clear any existing poll data
   };
 
+  // When a saved live poll is resumed from the dashboard the server has no
+  // record of it yet; register it once the socket is up so votes can be cast.
+  useEffect(() => {
+    const poll = pollState.currentPoll;
+    if (!socket || !isConnected || !poll || !currentLivePollId) return;
+    if (socketPollId === poll.id) return;
+    socket.emit('create-poll', { question: poll.question, options: poll.options, id: poll.id, showResults: poll.showResults });
+  }, [socket, isConnected, pollState.currentPoll, currentLivePollId, socketPollId]);
+
   const currentPoll = pollState.currentPoll;
   // const hasActivePoll = currentPoll?.isActive;
 

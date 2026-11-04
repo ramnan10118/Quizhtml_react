@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowRight, LogOut, Radio, Users } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, Input, Button, Label, cn } from '@/components/ui'
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, Input, Button, Label, Alert, AlertDescription, cn } from '@/components/ui'
 import { Header } from '@/components/layout/Header';
 import { ConnectionStatus } from '@/components/layout/ConnectionStatus';
 import { QuestionDisplay } from '@/components/quiz/QuestionDisplay';
@@ -45,6 +45,10 @@ export default function JoinPage() {
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [leaderboardVisible, setLeaderboardVisible] = useState(false);
   const [announcements, setAnnouncements] = useState<Array<{ message: string; timestamp: number }>>([]);
+  const [joinError, setJoinError] = useState<string | null>(null);
+  // Correct answers arrive from the server only when revealed (or after a basic-mode submission).
+  const [correctAnswers, setCorrectAnswers] = useState<Record<number, number>>({});
+  const [basicResult, setBasicResult] = useState<{ score: number; totalQuestions: number; correctAnswers?: number[] } | null>(null);
   
   const { success, error, connectionChange } = useHapticFeedback();
   
@@ -66,7 +70,7 @@ export default function JoinPage() {
       setQuizMode(data.mode);
       setQuizSettings(data.settings || {});
       const receivedQuestions = (data.questions || []) as QuizQuestion[];
-      setQuestions(receivedQuestions);
+      if (receivedQuestions.length > 0) setQuestions(receivedQuestions);
       
       // Initialize revealed questions state for scheduled mode
       if (data.mode === 'scheduled' && receivedQuestions.length > 0) {
@@ -146,7 +150,7 @@ export default function JoinPage() {
 
     // Handle quiz ended by host
     socket.on('quiz-ended', (data: { message: string }) => {
-      alert(data.message);
+      setJoinError(data.message);
       // Clear participant data
       setTeamName('');
       setIsRegistered(false);
@@ -167,7 +171,7 @@ export default function JoinPage() {
     });
 
     socket.on('question-revealed', (data: { questionIndex: number; correctAnswer: number }) => {
-      console.log('Question revealed:', data);
+      setCorrectAnswers(prev => ({ ...prev, [data.questionIndex]: data.correctAnswer }));
       setRevealedQuestions(prev => 
         prev.map((q, index) => 
           index === data.questionIndex 
@@ -177,8 +181,10 @@ export default function JoinPage() {
       );
     });
 
-    socket.on('all-questions-revealed', (data: { leaderboard: LeaderboardEntry[] }) => {
-      console.log('All questions revealed:', data);
+    socket.on('all-questions-revealed', (data: { leaderboard: LeaderboardEntry[]; correctAnswers?: number[] }) => {
+      if (data.correctAnswers) {
+        setCorrectAnswers(Object.fromEntries(data.correctAnswers.map((c, i) => [i, c])));
+      }
       setRevealedQuestions(prev => 
         prev.map(q => ({ ...q, isRevealed: true, revealedAt: Date.now() }))
       );
@@ -192,8 +198,40 @@ export default function JoinPage() {
     });
 
     socket.on('announcement', (data: { message: string; timestamp: number }) => {
-      console.log('Announcement received:', data);
       setAnnouncements(prev => [...prev, data]);
+    });
+
+    socket.on('session-joined-successfully', () => {
+      setJoinError(null);
+      socket.emit('request-question-number');
+    });
+
+    socket.on('session-join-failed', (data: { error: string }) => {
+      setJoinError(data.error || 'Could not join this quiz');
+      setIsRegistered(false);
+      setTeamName('');
+    });
+
+    socket.on('session-questions-updated', (data: { questions: PublicQuizQuestion[] }) => {
+      if (Array.isArray(data.questions) && data.questions.length > 0) {
+        setQuestions(data.questions as QuizQuestion[]);
+      }
+    });
+
+    socket.on('basic-quiz-submitted', (data) => {
+      if (data && 'submission' in data) {
+        setBasicResult({
+          score: data.submission.score ?? 0,
+          totalQuestions: data.totalQuestions,
+          correctAnswers: data.correctAnswers
+        });
+      }
+    });
+
+    socket.on('error', (data: { message: string }) => {
+      setJoinError(data?.message || 'Something went wrong');
+      // A rejected submission must not leave the screen stuck on "submitted".
+      if (data?.message?.toLowerCase().includes('submit')) setIsQuizSubmitted(false);
     });
 
 
@@ -215,6 +253,11 @@ export default function JoinPage() {
       socket.off('all-questions-revealed');
       socket.off('leaderboard-updated');
       socket.off('announcement');
+      socket.off('session-joined-successfully');
+      socket.off('session-join-failed');
+      socket.off('session-questions-updated');
+      socket.off('basic-quiz-submitted');
+      socket.off('error');
     };
   }, [socket, updateCurrentQuestion, setSinglePlayerBuzzState, success, error, connectionChange, isRegistered, teamName, router]);
 
@@ -233,30 +276,16 @@ export default function JoinPage() {
       const urlParams = new URLSearchParams(window.location.search);
       const sessionId = urlParams.get('session');
       
-      if (sessionId) {
-        console.log('🎯 Joining specific session:', sessionId);
-        // Use new session-specific joining
-        socket.emit('join-quiz-session', { sessionId, teamName: name });
-        
-        // Listen for session join confirmation
-        socket.on('session-joined-successfully', (data) => {
-          console.log('✅ Successfully joined session:', data);
-          socket.emit('request-question-number');
-        });
-        
-        socket.on('session-join-failed', (data) => {
-          console.error('❌ Failed to join session:', data);
-          alert(`Failed to join quiz: ${data.error}`);
-          setIsRegistered(false);
-          setTeamName('');
-        });
-      } else {
-        console.log('🔄 Using legacy join method');
-        // Fall back to legacy method
-        socket.emit('register-team', { teamName: name });
-        socket.emit('request-question-number');
+      if (!sessionId) {
+        setJoinError('This link has no session code. Ask the host for the join link or scan their QR code.');
+        setIsRegistered(false);
+        setTeamName('');
+        error();
+        return;
       }
-      
+
+      setJoinError(null);
+      socket.emit('join-quiz-session', { sessionId, teamName: name });
       success();
     }
   };
@@ -344,6 +373,11 @@ export default function JoinPage() {
         )}
       >
         <div className="w-full max-w-lg space-y-4">
+          {isRegistered && joinError && (
+            <Alert variant="warning" onClick={() => setJoinError(null)}>
+              <AlertDescription>{joinError}</AlertDescription>
+            </Alert>
+          )}
           {!isRegistered ? (
             /* Registration Form */
             <Card className="stage-bg animate-fade-up">
@@ -359,6 +393,11 @@ export default function JoinPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
+                {joinError && (
+                  <Alert variant="destructive">
+                    <AlertDescription>{joinError}</AlertDescription>
+                  </Alert>
+                )}
                 <div className="space-y-2">
                   <Label htmlFor="team-name">{quizMode === 'buzzer' ? 'Team name' : 'Your name'}</Label>
                   <Input
@@ -446,6 +485,7 @@ export default function JoinPage() {
                     }
                   }}
                   timeLimit={quizSettings.timeLimit}
+                  result={basicResult}
                   className="w-full"
                 />
               )}
@@ -455,6 +495,7 @@ export default function JoinPage() {
                   questions={questions}
                   participantName={teamName}
                   revealedQuestions={revealedQuestions}
+                  correctAnswers={correctAnswers}
                   leaderboard={leaderboard}
                   leaderboardVisible={leaderboardVisible}
                   announcements={announcements}

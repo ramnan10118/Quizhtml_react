@@ -12,6 +12,8 @@ interface BasicQuizInterfaceProps {
   participantName: string
   onComplete: (answers: ParticipantAnswer[]) => void
   timeLimit?: number
+  /** Result returned by the server after submission. Correct answers are only present when the host allows showing them. */
+  result?: { score: number; totalQuestions: number; correctAnswers?: number[] } | null
   className?: string
 }
 
@@ -26,6 +28,7 @@ export function BasicQuizInterface({
   participantName,
   onComplete,
   timeLimit,
+  result = null,
   className
 }: BasicQuizInterfaceProps) {
   const [progress, setProgress] = useState<QuizProgress>({
@@ -36,7 +39,6 @@ export function BasicQuizInterface({
 
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isCompleted, setIsCompleted] = useState(false)
-  const [finalScore, setFinalScore] = useState(0)
 
   const handleSubmit = useCallback(async () => {
     if (isSubmitting) return
@@ -54,12 +56,7 @@ export function BasicQuizInterface({
     })
 
     try {
-      // Calculate score locally
-      const score = completeAnswers.filter((answer, index) =>
-        answer.selectedOption === questions[index]?.correct
-      ).length
-      setFinalScore(score)
-
+      // Scoring happens on the server; the result arrives via the `result` prop.
       onComplete(completeAnswers)
       // Clear saved progress
       const saveKey = `quiz-progress-${participantName}`
@@ -162,7 +159,18 @@ export function BasicQuizInterface({
 
   // Show completion state with results
   if (isCompleted) {
-    const percentage = Math.round((finalScore / questions.length) * 100)
+    if (!result) {
+      return (
+        <Card className={cn('w-full max-w-4xl mx-auto', className)}>
+          <CardContent className="p-8 text-center">
+            <p className="text-sm text-muted-foreground">Submitting your answers…</p>
+          </CardContent>
+        </Card>
+      )
+    }
+    const finalScore = result.score
+    const key = result.correctAnswers
+    const percentage = Math.round((finalScore / (result.totalQuestions || questions.length)) * 100)
     const completeAnswers = questions.map((_, index) => {
       const existingAnswer = progress.answers.find(a => a.questionIndex === index)
       return existingAnswer || {
@@ -171,8 +179,8 @@ export function BasicQuizInterface({
         timestamp: Date.now()
       }
     })
-    const incorrect = completeAnswers.filter((a, i) => a.selectedOption !== -1 && a.selectedOption !== questions[i].correct).length
     const skipped = completeAnswers.filter(a => a.selectedOption === -1).length
+    const incorrect = Math.max(0, questions.length - skipped - finalScore)
 
     return (
       <div className={cn('w-full max-w-4xl mx-auto space-y-5 animate-fade-up', className)}>
@@ -199,12 +207,13 @@ export function BasicQuizInterface({
         {/* Question Results */}
         <Card>
           <CardHeader>
-            <CardTitle>Your answers</CardTitle>
+            <CardTitle>{key ? 'Your answers' : 'What you answered'}</CardTitle>
           </CardHeader>
           <CardContent className="divide-y divide-border">
             {questions.map((question, index) => {
               const userAnswer = completeAnswers[index]
-              const isCorrect = userAnswer.selectedOption === question.correct
+              const correctIndex = key ? key[index] : undefined
+              const isCorrect = correctIndex !== undefined && userAnswer.selectedOption === correctIndex
               const wasAnswered = userAnswer.selectedOption !== -1
 
               return (
@@ -213,18 +222,22 @@ export function BasicQuizInterface({
                     <h3 className="text-sm font-semibold leading-snug text-foreground">
                       <span className="text-muted-foreground tabular">{index + 1}.</span> {question.text}
                     </h3>
-                    <Badge variant={isCorrect ? 'success' : wasAnswered ? 'destructive' : 'secondary'}>
-                      {isCorrect ? 'Correct' : wasAnswered ? 'Incorrect' : 'Skipped'}
-                    </Badge>
+                    {key ? (
+                      <Badge variant={isCorrect ? 'success' : wasAnswered ? 'destructive' : 'secondary'}>
+                        {isCorrect ? 'Correct' : wasAnswered ? 'Incorrect' : 'Skipped'}
+                      </Badge>
+                    ) : (
+                      <Badge variant="secondary">{wasAnswered ? 'Answered' : 'Skipped'}</Badge>
+                    )}
                   </div>
 
                   <div className="grid gap-2 sm:grid-cols-2">
                     {question.options.map((option, optionIndex) => {
                       const isUserChoice = userAnswer.selectedOption === optionIndex
-                      const isCorrectAnswer = question.correct === optionIndex
+                      const isCorrectAnswer = correctIndex === optionIndex
                       let state: AnswerOptionState = 'default'
                       if (isCorrectAnswer) state = 'correct'
-                      else if (isUserChoice) state = 'wrong'
+                      else if (isUserChoice) state = key ? 'wrong' : 'selected'
 
                       return (
                         <AnswerOption

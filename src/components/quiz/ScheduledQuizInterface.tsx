@@ -13,6 +13,8 @@ interface ScheduledQuizInterfaceProps {
   participantName: string
   onSubmitAnswers: (answers: ParticipantAnswer[]) => void
   revealedQuestions?: RevealState[]
+  /** questionIndex -> correct option, sent by the server as questions are revealed */
+  correctAnswers?: Record<number, number>
   leaderboard?: LeaderboardEntry[]
   leaderboardVisible?: boolean
   announcements?: Array<{ message: string; timestamp: number }>
@@ -27,6 +29,7 @@ export function ScheduledQuizInterface({
   participantName,
   onSubmitAnswers,
   revealedQuestions = [],
+  correctAnswers = {},
   leaderboard = [],
   leaderboardVisible = false,
   announcements = [],
@@ -201,7 +204,8 @@ export function ScheduledQuizInterface({
               const revealInfo = revealedQuestions.find(r => r.questionIndex === questionIndex)
               const isRevealed = revealInfo?.isRevealed || false
               const userAnswer = answers.find(a => a.questionIndex === questionIndex)
-              const selectedOption = userAnswer?.selectedOption || -1
+              const selectedOption = userAnswer?.selectedOption ?? -1
+              const correctIndex = correctAnswers[questionIndex] ?? question.correct
 
               if (!isRevealed) {
                 return (
@@ -216,7 +220,7 @@ export function ScheduledQuizInterface({
                 )
               }
 
-              const isCorrect = selectedOption === question.correct
+              const isCorrect = correctIndex !== undefined && selectedOption === correctIndex
               const wasAnswered = selectedOption !== -1
 
               return (
@@ -240,7 +244,7 @@ export function ScheduledQuizInterface({
                     <div className="mt-3 grid gap-2 sm:grid-cols-2">
                       {question.options.map((option, optionIndex) => {
                         const isSelected = selectedOption === optionIndex
-                        const isCorrectOption = optionIndex === question.correct
+                        const isCorrectOption = correctIndex !== undefined && optionIndex === correctIndex
                         let state: AnswerOptionState = 'default'
                         if (isCorrectOption) state = 'correct'
                         else if (isSelected && !isCorrect) state = 'wrong'
