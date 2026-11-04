@@ -721,6 +721,9 @@ app.prepare().then(() => {
         count: session.basicSubmissions.size,
         total: session.teams.size
       });
+      if (session.hostSocketId) {
+        io.to(session.hostSocketId).emit('results-summary', { submissions: Array.from(session.basicSubmissions.values()) });
+      }
       console.log(`Basic quiz submitted in session ${session.id}: ${participantName} (score: ${score})`);
     });
 
@@ -769,6 +772,14 @@ app.prepare().then(() => {
         participantName,
         submissionTime: submission.submissionTime
       });
+      // Push the full list to the host directly so the control room updates
+      // even if its refresh request is lost.
+      if (session.hostSocketId) {
+        io.to(session.hostSocketId).emit('all-submissions', {
+          submissions: Array.from(session.scheduledSubmissions.values()),
+          revealedQuestions: session.revealedQuestions || []
+        });
+      }
       console.log(`Scheduled submission stored in session ${session.id} for ${participantName}`);
     });
 

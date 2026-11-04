@@ -328,9 +328,14 @@ function HostPageContent() {
       ]);
     });
 
-    socket.on('submission-received', (data: { participantName: string; submissionTime: number }) => {
-      console.log('Quiz submission notification:', data);
-      // This is just a notification event - actual data comes from specific mode events
+    socket.on('submission-received', () => {
+      // A participant submitted: pull the authoritative list from the server.
+      if (currentMode === 'scheduled') {
+        socket.emit('get-all-submissions');
+        socket.emit('get-leaderboard-status');
+      } else if (currentMode === 'basic') {
+        socket.emit('get-results-summary');
+      }
     });
 
     // Scheduled mode events
