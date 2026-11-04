@@ -9,6 +9,7 @@ interface BasicQuizHostControlsProps {
   submissions: ParticipantSubmission[]
   settings: QuizSettings
   participantCount: number
+  joinUrl: string
   onSettingsUpdate: (settings: Partial<QuizSettings>) => void
   onRefreshData: () => void
   className?: string
@@ -18,6 +19,7 @@ export function BasicQuizHostControls({
   submissions,
   settings,
   participantCount,
+  joinUrl,
   onSettingsUpdate,
   onRefreshData,
   className
@@ -37,7 +39,6 @@ export function BasicQuizHostControls({
     ? completedSubmissions.filter(s => s.passed ?? pct(s) >= settings.passingScore!).length
     : 0
 
-  const joinLink = typeof window !== 'undefined' ? window.location.href.replace('/host', '/join') : ''
 
   return (
     <div className={cn('space-y-5', className)}>
@@ -221,7 +222,7 @@ export function BasicQuizHostControls({
           <div className="flex items-center gap-2">
             <input
               type="text"
-              value={window.location.href.replace('/host', '/join')}
+              value={joinUrl}
               readOnly
               aria-label="Join link"
               className="h-10 min-w-0 flex-1 rounded-md border border-input bg-surface-raised px-3 font-mono text-xs text-foreground focus-ring"
@@ -230,7 +231,7 @@ export function BasicQuizHostControls({
               size="sm"
               variant={copied ? 'success' : 'default'}
               onClick={() => {
-                navigator.clipboard.writeText(window.location.href.replace('/host', '/join'))
+                navigator.clipboard.writeText(joinUrl)
                 setCopied(true)
                 setTimeout(() => setCopied(false), 2000)
               }}
@@ -239,7 +240,6 @@ export function BasicQuizHostControls({
               {copied ? 'Copied' : 'Copy link'}
             </Button>
           </div>
-          {!joinLink && <span className="sr-only">Join link unavailable</span>}
         </CardContent>
       </Card>
     </div>

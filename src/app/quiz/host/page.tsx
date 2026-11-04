@@ -47,6 +47,7 @@ function HostPageContent() {
   const {
     quizState,
     addTeam,
+    setTeams,
     removeTeam,
     addBuzz,
     resetBuzzer,
@@ -72,7 +73,7 @@ function HostPageContent() {
   const [highlightedOption, setHighlightedOption] = useState<number | null>(null);
   
   // Basic/Scheduled mode specific state
-  const [participants] = useState<Array<{ name: string; socketId: string }>>([]);
+  const [ending, setEnding] = useState(false);
   const [basicSubmissions, setBasicSubmissions] = useState<ParticipantSubmission[]>([]);
   const [scheduledSubmissions, setScheduledSubmissions] = useState<ParticipantSubmission[]>([]);
   const [revealedQuestions, setRevealedQuestions] = useState<RevealState[]>([]);
@@ -148,8 +149,11 @@ function HostPageContent() {
     };
 
     const onCreated = (data: { sessionId: string; hostToken?: string }) => onSessionReady(data.sessionId, data.hostToken);
-    const onRecovered = (data: { sessionId: string; sessionData?: { hostToken?: string } }) =>
+    const onRecovered = (data: { sessionId: string; sessionData?: { hostToken?: string; teams?: Array<[string, string]> } }) => {
+      // The server's roster is authoritative; stored socket ids are stale after a reload.
+      if (Array.isArray(data.sessionData?.teams)) setTeams(data.sessionData.teams);
       onSessionReady(data.sessionId, data.sessionData?.hostToken);
+    };
     const onCreateError = (data: { error: string }) => {
       cleanup();
       setSessionError(data.error || 'Could not start a session');
@@ -504,18 +508,39 @@ function HostPageContent() {
     }
   };
 
-  const handleExitQuiz = () => {
-    if (confirm('Are you sure you want to exit the quiz? This will end the session for all participants.')) {
-      if (socket) {
-        socket.emit('host-exit-quiz');
+  // End the quiz for everyone. A live (saved) quiz is stored as completed with
+  // its final submissions and leaderboard, then the host lands on its results.
+  const handleEndQuiz = async () => {
+    const isLive = !!liveQuizIdRef.current;
+    const message = isLive
+      ? 'End this quiz for all participants? Results will be saved and no more answers will be accepted.'
+      : 'End this quiz for all participants? Nothing from this session will be saved.';
+    if (!confirm(message)) return;
+
+    setEnding(true);
+    if (socket) socket.emit('host-exit-quiz');
+
+    const liveId = liveQuizIdRef.current;
+    if (liveId) {
+      try {
+        await persistLiveQuiz({
+          submissions: currentMode === 'basic' ? basicSubmissions : scheduledSubmissions,
+          revealedQuestions,
+          leaderboard,
+          leaderboardVisible
+        });
+        await liveQuizzes.complete(liveId);
+      } catch (err) {
+        console.error('Failed to store completed quiz:', err);
+        setSessionError('The quiz was ended but could not be saved. Check your connection and try again from the dashboard.');
+        setEnding(false);
+        return;
       }
-      // Clear custom questions from storage
-      sessionStorage.removeItem('customQuestions');
-      // Clear saved quiz state
-      clearSavedState();
-      // Redirect to mode selection
-      router.push('/mode');
     }
+
+    sessionStorage.removeItem('customQuestions');
+    clearSavedState();
+    router.push(liveId ? `/quiz/results?id=${liveId}` : '/mode');
   };
 
   // Add handlers for new modes
@@ -601,8 +626,10 @@ function HostPageContent() {
   };
 
 
-  // Calculate participant and submission counts
-  const participantCount = currentMode === 'buzzer' ? quizState.teams.size : participants.length;
+  // Everyone currently seated in the session, in every mode (names arrive the
+  // moment a participant joins, before they answer anything).
+  const participants = Array.from(quizState.teams.entries()).map(([socketId, name]) => ({ name, socketId }));
+  const participantCount = participants.length;
   const submissionCount = currentMode === 'basic' ? basicSubmissions.length : 
                          currentMode === 'scheduled' ? scheduledSubmissions.length : 0;
 
@@ -636,8 +663,8 @@ function HostPageContent() {
         }
       >
         <ConnectionStatus status={connectionStatus} compact />
-        <Button onClick={handleExitQuiz} variant="destructive" size="sm" aria-label="Exit quiz">
-          <LogOut /> <span className="hidden sm:inline">Exit quiz</span>
+        <Button onClick={handleEndQuiz} variant="destructive" size="sm" aria-label="End quiz" disabled={ending}>
+          <LogOut /> <span className="hidden sm:inline">{ending ? 'Ending…' : 'End quiz'}</span>
         </Button>
       </Header>
 

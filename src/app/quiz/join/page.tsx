@@ -150,14 +150,13 @@ export default function JoinPage() {
 
     // Handle quiz ended by host
     socket.on('quiz-ended', (data: { message: string }) => {
-      setJoinError(data.message);
-      // Clear participant data
+      // Back to the join form with the host's message; the session is gone so
+      // re-joining is no longer possible.
+      setJoinError(data.message || 'The quiz has been ended by the host.');
       setTeamName('');
       setIsRegistered(false);
       setInputName('');
       setSinglePlayerBuzzState(false);
-      // Redirect to mode selection
-      router.push('/mode');
     });
 
     // Basic mode events

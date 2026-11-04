@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { AlertTriangle, BarChart3, CheckCircle2, FileText, LayoutDashboard, LogOut, Pencil, Play, Plus, Radio, Trash2, Trophy, Vote, Zap } from 'lucide-react'
+import { AlertTriangle, BarChart3, CheckCircle2, FileText, LayoutDashboard, LogOut, Pencil, Play, Plus, Radio, Square, Trash2, Trophy, Vote, Zap } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { ProtectedRoute } from '@/components/ProtectedRoute'
 import { AppShell } from '@/components/layout/AppShell'
@@ -117,6 +117,23 @@ export default function DashboardPage() {
 
   const handleViewQuizResults = (quizId: string) => {
     router.push(`/quiz/results?id=${quizId}`)
+  }
+
+  // Mark a live quiz as completed from the dashboard. Saved submissions are
+  // kept and the quiz moves to the completed list, where it can be deleted.
+  const handleEndLiveQuiz = async (quiz: LiveQuiz) => {
+    if (!confirm(`End "${quiz.title}"? Participants can no longer submit and its results will be kept.`)) {
+      return
+    }
+
+    try {
+      await liveQuizzes.complete(quiz.id)
+      setLiveQuizzesList(liveQuizzesList.filter(item => item.id !== quiz.id))
+      setQuizHistoryList([{ ...quiz, status: 'completed' }, ...quizHistoryList])
+    } catch (error) {
+      setError('Failed to end live quiz')
+      console.error('End live quiz error:', error)
+    }
   }
 
   const handleLoadQuizDraft = (draftId: string) => {
@@ -295,6 +312,9 @@ export default function DashboardPage() {
                             </Button>
                             <Button onClick={() => handleViewQuizResults(liveQuiz.id)} variant="outline" size="sm">
                               <BarChart3 /> Results
+                            </Button>
+                            <Button onClick={() => handleEndLiveQuiz(liveQuiz)} variant="outline" size="sm" aria-label={`End ${liveQuiz.title}`}>
+                              <Square /> End
                             </Button>
                           </>
                         }

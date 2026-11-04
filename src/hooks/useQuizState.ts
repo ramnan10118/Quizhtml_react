@@ -213,6 +213,19 @@ export function useQuizState(isHost: boolean = false) {
     });
   }, []);
 
+  // Replace the whole roster with the server's authoritative list (used after a
+  // host reconnect, when stored socket ids are stale).
+  const setTeams = useCallback((entries: Array<[string, string]>) => {
+    setQuizState(prev => {
+      const newTeams = new Map(entries);
+      const newScores = new Map(prev.scores);
+      newTeams.forEach((teamName) => {
+        if (!newScores.has(teamName)) newScores.set(teamName, 0);
+      });
+      return { ...prev, teams: newTeams, scores: newScores };
+    });
+  }, []);
+
   const removeTeam = useCallback((socketId: string) => {
     setQuizState(prev => {
       const teamName = prev.teams.get(socketId);
@@ -356,6 +369,7 @@ export function useQuizState(isHost: boolean = false) {
     quizState,
     updateCurrentQuestion,
     addTeam,
+    setTeams,
     removeTeam,
     addBuzz,
     resetBuzzer,

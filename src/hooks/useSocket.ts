@@ -16,32 +16,26 @@ export function useSocket(serverUrl?: string) {
 
     setSocket(socketInstance);
 
-    socketInstance.on('connect', () => {
-      setConnectionStatus({
-        isConnected: true,
-        connectionMessage: '✅ Connected'
-      });
-    });
-
-    socketInstance.on('disconnect', () => {
-      setConnectionStatus({
-        isConnected: false,
-        connectionMessage: '❌ Disconnected'
-      });
-    });
-
-    socketInstance.on('connect_error', (error) => {
+    // The socket is a shared singleton: when this page mounts after a client-side
+    // navigation it is usually already connected, so reflect that immediately
+    // instead of waiting for a 'connect' event that already fired.
+    const onConnect = () => setConnectionStatus({ isConnected: true, connectionMessage: '✅ Connected' });
+    const onDisconnect = () => setConnectionStatus({ isConnected: false, connectionMessage: '❌ Disconnected' });
+    const onError = (error: Error) => {
       console.error('Socket connection error:', error);
-      setConnectionStatus({
-        isConnected: false,
-        connectionMessage: '❌ Connection Error'
-      });
-    });
+      setConnectionStatus({ isConnected: false, connectionMessage: '❌ Connection Error' });
+    };
+
+    if (socketInstance.connected) onConnect();
+    socketInstance.on('connect', onConnect);
+    socketInstance.on('disconnect', onDisconnect);
+    socketInstance.on('connect_error', onError);
 
     return () => {
-      // Don't disconnect on cleanup - let the singleton manage its lifecycle
-      // Only disconnect if component is actually unmounting permanently
-      console.log('🧹 useSocket cleanup - keeping socket alive for potential reconnection');
+      // Keep the singleton connected; only drop this component's listeners.
+      socketInstance.off('connect', onConnect);
+      socketInstance.off('disconnect', onDisconnect);
+      socketInstance.off('connect_error', onError);
     };
   }, [serverUrl]);
 

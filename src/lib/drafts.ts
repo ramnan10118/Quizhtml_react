@@ -557,7 +557,7 @@ export const liveQuizzes = {
       .eq('id', id)
       .eq('user_id', user.id)
       .eq('type', 'quiz')
-      .eq('status', 'live')
+      .in('status', ['live', 'completed'])
 
     if (error) throw error
   }

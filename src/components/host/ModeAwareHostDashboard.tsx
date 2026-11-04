@@ -95,6 +95,11 @@ export function ModeAwareHostDashboard({
     }
   }, [mode, basicSubmissions.length, submissionCount, revealedQuestions, currentTab])
 
+  // Join link for participants (the session id is only known once the server
+  // has created the session; a saved live quiz falls back to its id).
+  const sessionForLink = currentSessionId || searchParams?.get('live') || null
+  const shareUrl = `${typeof window !== 'undefined' ? window.location.origin : ''}/quiz/join${sessionForLink ? `?session=${sessionForLink}` : ''}`
+
   const renderControlPanel = () => {
     switch (mode) {
       case 'basic':
@@ -103,6 +108,7 @@ export function ModeAwareHostDashboard({
             submissions={basicSubmissions}
             settings={settings}
             participantCount={participantCount}
+            joinUrl={shareUrl}
             onSettingsUpdate={onSettingsUpdate}
             onRefreshData={onRefreshData || (() => {})}
           />
@@ -158,27 +164,32 @@ export function ModeAwareHostDashboard({
       )
     }
 
-    // For basic and scheduled modes, show submission status
+    // For basic and scheduled modes: everyone who has joined, with their
+    // submission status. Joined names show up immediately; a submission
+    // upgrades the row, and submitters who have since left stay listed.
     const getParticipantData = () => {
-      if (mode === 'basic') {
-        return basicSubmissions.map(sub => ({
+      const submissions = mode === 'basic' ? basicSubmissions : scheduledSubmissions
+      const doneLabel = mode === 'basic' ? 'Completed' : 'Submitted'
+      const key = (name: string) => name.trim().toLowerCase()
+
+      const rows = new Map<string, { name: string; status: string; score?: number; submissionTime?: number }>()
+      participants.forEach(p => {
+        rows.set(key(p.name), { name: p.name, status: 'Joined · answering', score: undefined, submissionTime: undefined })
+      })
+      submissions.forEach(sub => {
+        rows.set(key(sub.participantName), {
           name: sub.participantName,
-          status: sub.isComplete ? 'Completed' : 'In Progress',
-          score: sub.score,
+          status: sub.isComplete ? doneLabel : 'In Progress',
+          score: mode === 'basic' ? sub.score : undefined, // No score for scheduled until revealed
           submissionTime: sub.submissionTime
-        }))
-      }
-
-      if (mode === 'scheduled') {
-        return scheduledSubmissions.map(sub => ({
-          name: sub.participantName,
-          status: sub.isComplete ? 'Submitted' : 'In Progress',
-          submissionTime: sub.submissionTime,
-          score: undefined // No score for scheduled until revealed
-        }))
-      }
-
-      return []
+        })
+      })
+      return Array.from(rows.values()).sort((x, y) => {
+        const xd = x.status === doneLabel ? 1 : 0
+        const yd = y.status === doneLabel ? 1 : 0
+        if (xd !== yd) return yd - xd
+        return (y.submissionTime || 0) - (x.submissionTime || 0)
+      })
     }
 
     const participantData = getParticipantData()
@@ -264,17 +275,6 @@ export function ModeAwareHostDashboard({
   }
 
   const renderSettingsTab = () => {
-    // Generate share URL with debug logging
-    const shareUrl = currentSessionId
-      ? `${typeof window !== 'undefined' ? window.location.origin : ''}/quiz/join?session=${currentSessionId}`
-      : (searchParams?.get('live')
-          ? `${typeof window !== 'undefined' ? window.location.origin : ''}/quiz/join?session=${searchParams.get('live')}`
-          : `${typeof window !== 'undefined' ? window.location.origin : ''}/quiz/join`
-        );
-
-    console.log('🔗 Settings Tab - Generated share URL:', shareUrl);
-    console.log('🔗 Settings Tab - currentSessionId:', currentSessionId);
-    console.log('🔗 Settings Tab - live param:', searchParams?.get('live'));
 
     return (
       <Card>
