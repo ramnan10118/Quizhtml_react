@@ -67,7 +67,7 @@ function QuizResultsPageContent() {
   if (error || !quiz) {
     return (
       <ProtectedRoute>
-        <AppShell backHref="/dashboard" backLabel="Dashboard" maxWidth="lg">
+        <AppShell backHref="/dashboard" backLabel="Quiz" maxWidth="lg">
           <Card>
             <CardContent className="p-0">
               <EmptyState
@@ -102,7 +102,7 @@ function QuizResultsPageContent() {
     <ProtectedRoute>
       <AppShell
         backHref="/dashboard"
-        backLabel="Dashboard"
+        backLabel="Quiz"
         eyebrow="Quiz results"
         title={quiz.title}
         subtitle={`Scheduled reveal · created ${new Date(quiz.created_at).toLocaleDateString(undefined, { dateStyle: 'medium' })}`}

@@ -197,7 +197,7 @@ export default function DashboardPage() {
             </Button>
           </>
         }
-        eyebrow="Dashboard"
+        eyebrow="Quiz"
         title={firstName ? `Welcome back, ${firstName}` : 'Welcome back'}
         subtitle="Your drafts, live sessions and past results in one place."
         headingActions={

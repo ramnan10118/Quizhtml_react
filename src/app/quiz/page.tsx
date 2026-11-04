@@ -20,7 +20,7 @@ export default function QuizPage() {
     <ProtectedRoute>
       <AppShell
         backHref="/dashboard"
-        backLabel="Dashboard"
+        backLabel="Quiz"
         eyebrow="New quiz · step 1 of 2"
         title="Choose a quiz mode"
         subtitle="Pick how participants will play. You can add questions on the next step."

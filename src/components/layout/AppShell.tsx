@@ -3,7 +3,7 @@
 import * as React from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { ArrowLeft, LayoutDashboard, Vote } from 'lucide-react'
+import { ArrowLeft, ListChecks, Vote } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { BrandMark } from './BrandMark'
 
@@ -41,7 +41,7 @@ const widths = {
 }
 
 export const DEFAULT_APP_NAV: AppNavItem[] = [
-  { href: '/dashboard', label: 'Dashboard', icon: <LayoutDashboard /> },
+  { href: '/dashboard', label: 'Quiz', icon: <ListChecks /> },
   { href: '/polling/host', label: 'Polls', icon: <Vote />, prefix: true },
 ]
 

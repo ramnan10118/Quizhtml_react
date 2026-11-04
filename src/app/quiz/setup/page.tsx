@@ -406,7 +406,7 @@ function QuizSetupContent() {
     <ProtectedRoute>
       <AppShell
         backHref="/dashboard"
-        backLabel="Dashboard"
+        backLabel="Quiz"
         eyebrow={currentDraft ? 'Edit draft' : 'New quiz'}
         title={loadingDraft ? 'Loading draft…' : currentDraft ? 'Edit quiz draft' : 'Build your quiz'}
         subtitle="Generate questions with AI or write them by hand, then launch."
