@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { AlertTriangle, BarChart3, CheckCircle2, FileText, LayoutDashboard, LogOut, Pencil, Play, Plus, Radio, Square, Trash2, Trophy, Vote, Zap } from 'lucide-react'
+import { AlertTriangle, BarChart3, CheckCircle2, FileText, LogOut, Pencil, Play, Plus, Radio, Square, Trash2, Trophy, Vote, Zap } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { ProtectedRoute } from '@/components/ProtectedRoute'
 import { AppShell } from '@/components/layout/AppShell'
@@ -187,14 +187,10 @@ export default function DashboardPage() {
   return (
     <ProtectedRoute>
       <AppShell
-        nav={[
-          { href: '/dashboard', label: 'Dashboard', icon: <LayoutDashboard /> },
-          { href: '/polling/host', label: 'Polls', icon: <Vote />, prefix: true },
-        ]}
         actions={
           <>
-            <span className="hidden max-w-[200px] truncate text-sm text-muted-foreground sm:inline" title={displayName ?? undefined}>
-              {displayName}
+            <span className="hidden truncate px-3 text-xs text-muted-foreground md:block" title={displayName ?? undefined}>
+              Signed in as <span className="font-medium text-foreground">{displayName}</span>
             </span>
             <Button onClick={handleSignOut} variant="ghost" size="sm" aria-label="Sign out">
               <LogOut /> <span className="hidden sm:inline">Sign out</span>

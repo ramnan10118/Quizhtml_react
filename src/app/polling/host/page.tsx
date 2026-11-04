@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { io, Socket } from 'socket.io-client';
-import { AlertTriangle, CheckCircle2, LayoutDashboard, Plus, Save, Vote, X } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Plus, Save, Vote, X } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
@@ -389,10 +389,6 @@ function PollingHostContent() {
   return (
     <ProtectedRoute>
       <AppShell
-        nav={[
-          { href: '/dashboard', label: 'Dashboard', icon: <LayoutDashboard /> },
-          { href: '/polling/host', label: 'Polls', icon: <Vote />, prefix: true },
-        ]}
         actions={<ConnectionStatus status={{ isConnected, connectionMessage: isConnected ? 'Connected' : 'Connecting...' }} compact />}
         eyebrow="Live polling"
         title={currentPoll ? 'Poll in progress' : showCreator ? 'Create a poll' : 'Host a polling session'}
