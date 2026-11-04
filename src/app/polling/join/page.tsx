@@ -6,7 +6,6 @@ import { io, Socket } from 'socket.io-client';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Header } from '@/components/layout/Header';
-import { PollDisplay } from '@/components/polling/PollDisplay';
 import { usePollState } from '@/hooks/usePollState';
 import { Poll, PollResults } from '@/types/polling';
 
@@ -24,8 +23,7 @@ export default function PollingJoinPage() {
     pollState,
     setCurrentPoll,
     updatePoll,
-    setVoteStatus,
-    getPollResults
+    setVoteStatus
   } = usePollState(false);
 
   useEffect(() => {
@@ -82,7 +80,7 @@ export default function PollingJoinPage() {
       console.log('Vote confirmed:', data);
       setVoteSubmitted(true);
       setSelectedOption(data.optionIndex);
-      setVoteStatus(true, data.optionIndex);
+      setVoteStatus(true);
       
       // Haptic feedback
       if (navigator.vibrate) {

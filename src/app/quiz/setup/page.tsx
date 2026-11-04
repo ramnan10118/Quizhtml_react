@@ -8,11 +8,6 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { QuizQuestion } from '@/types/quiz';
 
-
-
-
-const DEFAULT_QUESTIONS: QuizQuestion[] = [];
-
 export default function QuizSetupPage() {
   const router = useRouter();
   const [questions, setQuestions] = useState<QuizQuestion[]>([]);

@@ -131,7 +131,7 @@ export default function JoinPage() {
       socket.off('celebrate');
       socket.off('quiz-ended');
     };
-  }, [socket, updateCurrentQuestion, setSinglePlayerBuzzState, success, error, connectionChange, isRegistered, teamName]);
+  }, [socket, router, updateCurrentQuestion, setSinglePlayerBuzzState, success, error, connectionChange, isRegistered, teamName]);
 
   const handleRegisterTeam = () => {
     const name = inputName.trim();

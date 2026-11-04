@@ -1,5 +1,6 @@
-import React, { useState, useCallback, useEffect } from 'react';
-import { QuizState, QuizQuestion, RankingData, QUIZ_QUESTIONS } from '@/types/quiz';
+import { useState, useCallback, useEffect } from 'react';
+import { QuizState, QuizQuestion, RankingData } from '@/types/quiz';
+import defaultQuestions from '@/data/default-questions.json';
 
 // Get custom questions from sessionStorage if available
 const getCustomQuestions = (): QuizQuestion[] => {
@@ -13,7 +14,7 @@ const getCustomQuestions = (): QuizQuestion[] => {
       }
     }
   }
-  return QUIZ_QUESTIONS;
+  return defaultQuestions as QuizQuestion[];
 };
 
 const initialState: QuizState = {

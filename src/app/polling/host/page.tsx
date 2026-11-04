@@ -5,7 +5,6 @@ import Link from 'next/link';
 import { io, Socket } from 'socket.io-client';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
-import { Header } from '@/components/layout/Header';
 import { SharePanel } from '@/components/ui/SharePanel';
 import { PollCreator } from '@/components/polling/PollCreator';
 import { PollResults } from '@/components/polling/PollResults';
@@ -24,9 +23,7 @@ export default function PollingHostPage() {
     pollState,
     setCurrentPoll,
     updatePoll,
-    closePoll,
-    resetPollState,
-    getPollResults
+    closePoll
   } = usePollState(true);
 
   useEffect(() => {
@@ -101,7 +98,6 @@ export default function PollingHostPage() {
   };
 
   const currentPoll = pollState.currentPoll;
-  const hasActivePoll = currentPoll?.isActive;
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-dark-900 dark">
