@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
     const enhancementPrompt = enhancementPrompts[enhancementType as keyof typeof enhancementPrompts];
     
     const result = await generateObject({
-      model: openai('gpt-3.5-turbo'),
+      model: openai('gpt-4o-mini'),
       schema: EnhancedQuestionSchema,
       prompt: `You are a quiz question enhancement specialist. Your task is to enhance the following multiple choice question based on the specific enhancement type requested.
 
