@@ -1,40 +1,117 @@
 const { createServer } = require('http');
 const { parse } = require('url');
+const { randomUUID } = require('crypto');
 const next = require('next');
 const { Server } = require('socket.io');
 
 const dev = process.env.NODE_ENV !== 'production';
 const hostname = 'localhost';
-const port = process.env.PORT || 3000;
+const port = parseInt(process.env.PORT || '3000', 10);
 
 const app = next({ dev, hostname, port });
 const handler = app.getRequestHandler();
 
-// Session Manager for in-memory caching
+// Safety net: a bug in one socket handler must never take the whole server down.
+// Socket.io dispatches handlers on process.nextTick, so a throw is otherwise fatal.
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught exception (server kept alive):', err);
+});
+process.on('unhandledRejection', (err) => {
+  console.error('Unhandled rejection (server kept alive):', err);
+});
+
+// ---------------------------------------------------------------------------
+// Limits and validation helpers
+// ---------------------------------------------------------------------------
+const SESSION_TIMEOUT_MS = 2 * 60 * 60 * 1000; // 2 hours of inactivity
+const DISCONNECT_GRACE_MS = 60 * 1000;         // keep a participant's seat for 60s
+const MAX_NAME_LENGTH = 40;
+const MAX_TEXT_LENGTH = 500;
+const MAX_QUESTIONS = 100;
+const MAX_POLL_OPTIONS = 10;
+const MAX_ANNOUNCEMENT_LENGTH = 300;
+
+const isInt = (v) => Number.isInteger(v);
+
+function sanitizeName(value) {
+  return typeof value === 'string' ? value.trim().slice(0, MAX_NAME_LENGTH) : '';
+}
+
+function sanitizeText(value, max = MAX_TEXT_LENGTH) {
+  return typeof value === 'string' ? value.trim().slice(0, max) : '';
+}
+
+function isValidQuestion(q) {
+  return (
+    q && typeof q === 'object' &&
+    typeof q.text === 'string' && q.text.trim().length > 0 && q.text.length <= MAX_TEXT_LENGTH &&
+    Array.isArray(q.options) && q.options.length === 4 &&
+    q.options.every((o) => typeof o === 'string' && o.length <= MAX_TEXT_LENGTH) &&
+    isInt(q.correct) && q.correct >= 0 && q.correct <= 3
+  );
+}
+
+function normalizeQuestions(list) {
+  if (!Array.isArray(list) || list.length === 0 || list.length > MAX_QUESTIONS) return null;
+  if (!list.every(isValidQuestion)) return null;
+  return list.map((q) => ({ text: q.text.trim(), options: q.options.map(String), correct: q.correct }));
+}
+
+function normalizeAnswers(answers, questionCount) {
+  if (!Array.isArray(answers) || answers.length > questionCount) return null;
+  const out = [];
+  for (const a of answers) {
+    if (!a || typeof a !== 'object') return null;
+    if (!isInt(a.questionIndex) || a.questionIndex < 0 || a.questionIndex >= questionCount) return null;
+    const sel = a.selectedOption;
+    if (!(sel === -1 || (isInt(sel) && sel >= 0 && sel <= 3))) return null;
+    out.push({
+      questionIndex: a.questionIndex,
+      selectedOption: sel,
+      timestamp: isInt(a.timestamp) ? a.timestamp : Date.now()
+    });
+  }
+  return out;
+}
+
+// Participants must never receive the correct answer index before a reveal.
+const publicQuestion = (q) => (q ? { text: q.text, options: q.options } : null);
+const publicQuestions = (list) => (list || []).map(publicQuestion);
+const sameName = (a, b) => a.trim().toLowerCase() === b.trim().toLowerCase();
+
+// ---------------------------------------------------------------------------
+// Session manager (in-memory, one session per host)
+// ---------------------------------------------------------------------------
 class SessionManager {
   constructor() {
-    this.sessions = new Map(); // sessionId -> sessionData
-    this.userSessions = new Map(); // socketId -> sessionId
+    this.sessions = new Map();      // sessionId -> session
+    this.userSessions = new Map();  // socketId -> sessionId
     this.startCleanup();
   }
 
   generateSessionId() {
-    return 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+    return `session_${randomUUID()}`;
   }
 
   createSession(type = 'quiz', customSessionId = null, initialMode = 'buzzer') {
     const sessionId = customSessionId || this.generateSessionId();
-    const sessionData = {
+    const session = {
       id: sessionId,
-      type: type, // 'quiz' or 'poll'
+      type,
       createdAt: Date.now(),
       lastActivity: Date.now(),
-      
+
+      // Host identity. hostToken is handed only to the creator and lets the
+      // host reclaim the session after a reload/reconnect.
+      hostSocketId: null,
+      hostToken: randomUUID(),
+
       // Quiz state
       currentQuestion: 1,
       buzzOrder: [],
-      teams: new Map(),
-      scores: new Map(),
+      teams: new Map(),            // socketId -> teamName
+      scores: new Map(),           // teamName -> score
+      pendingRemovals: new Map(),  // socketId -> timeout
       quizMode: initialMode,
       quizSettings: {
         mode: initialMode,
@@ -43,46 +120,29 @@ class SessionManager {
         showCorrectAnswers: true,
         passingScore: undefined
       },
-      
-      // Basic mode state
-      basicSubmissions: new Map(),
-      
-      // Scheduled mode state
-      scheduledSubmissions: new Map(),
+
+      // Basic mode
+      basicSubmissions: new Map(),      // socketId -> submission
+
+      // Scheduled mode
+      scheduledSubmissions: new Map(),  // socketId -> submission
       revealedQuestions: [],
       leaderboardVisible: false,
       announcements: [],
-      
-      // Polling state
-      currentPoll: null,
-      pollHistory: [],
-      pollParticipants: new Map(),
-      
-      // Questions (can be overridden)
+
+      // Questions (full, including correct index; strip before sending to participants)
       questions: []
     };
-    
-    this.sessions.set(sessionId, sessionData);
+    this.sessions.set(sessionId, session);
     console.log(`Created new session: ${sessionId}`);
-    return sessionData;
-  }
-
-  getSession(sessionId) {
-    const session = this.sessions.get(sessionId);
-    if (session) {
-      session.lastActivity = Date.now();
-    }
     return session;
   }
 
-  updateSession(sessionId, updates) {
+  getSession(sessionId) {
+    if (typeof sessionId !== 'string') return undefined;
     const session = this.sessions.get(sessionId);
-    if (session) {
-      Object.assign(session, updates);
-      session.lastActivity = Date.now();
-      return session;
-    }
-    return null;
+    if (session) session.lastActivity = Date.now();
+    return session;
   }
 
   associateUserWithSession(socketId, sessionId) {
@@ -97,1150 +157,878 @@ class SessionManager {
   removeUserFromSession(socketId) {
     const sessionId = this.userSessions.get(socketId);
     if (sessionId) {
-      const session = this.getSession(sessionId);
+      const session = this.sessions.get(sessionId);
       if (session) {
-        // Remove user from session data
         const teamName = session.teams.get(socketId);
         session.teams.delete(socketId);
-        if (teamName) {
+        if (teamName && ![...session.teams.values()].some((n) => sameName(n, teamName))) {
           session.scores.delete(teamName);
         }
-        session.pollParticipants.delete(socketId);
-        session.basicSubmissions.delete(socketId);
-        session.scheduledSubmissions.delete(socketId);
+        session.pendingRemovals.delete(socketId);
+        // Submissions are kept so a returning participant keeps their result.
       }
     }
     this.userSessions.delete(socketId);
   }
 
+  deleteSession(sessionId) {
+    const session = this.sessions.get(sessionId);
+    if (!session) return;
+    for (const t of session.pendingRemovals.values()) clearTimeout(t);
+    this.sessions.delete(sessionId);
+    for (const [socketId, sessId] of this.userSessions) {
+      if (sessId === sessionId) this.userSessions.delete(socketId);
+    }
+  }
+
   startCleanup() {
     setInterval(() => {
       const now = Date.now();
-      const SESSION_TIMEOUT = 2 * 60 * 60 * 1000; // 2 hours
-      
-      for (let [sessionId, session] of this.sessions) {
-        if (now - session.lastActivity > SESSION_TIMEOUT) {
+      for (const [sessionId, session] of this.sessions) {
+        if (now - session.lastActivity > SESSION_TIMEOUT_MS) {
           console.log(`Cleaning up expired session: ${sessionId}`);
-          this.sessions.delete(sessionId);
-          
-          // Clean up user associations
-          for (let [socketId, sessId] of this.userSessions) {
-            if (sessId === sessionId) {
-              this.userSessions.delete(socketId);
-            }
-          }
+          this.deleteSession(sessionId);
         }
       }
-    }, 60000); // Check every minute
-  }
-
-  getAllSessions() {
-    return Array.from(this.sessions.values());
+    }, 60000);
   }
 }
 
-// Initialize session manager
 const sessionManager = new SessionManager();
 
-// Legacy global state - DEPRECATED (kept for cleanup)
-// All state is now managed in sessions for multi-host support
+// ---------------------------------------------------------------------------
+// Scoring
+// ---------------------------------------------------------------------------
+function percentage(score, total) {
+  return total > 0 ? Math.round((score / total) * 100) : 0;
+}
 
-// Default questions removed - all questions are now session-specific
+function passedFor(session, score) {
+  const passing = session.quizSettings.passingScore;
+  if (!isInt(passing) && typeof passing !== 'number') return undefined;
+  return percentage(score, session.questions.length) >= passing;
+}
 
-// Helper functions
-function calculateLeaderboard(sessionData = null) {
+function assignRanks(entries) {
+  // entries must already be sorted. Equal scores share a rank (1,1,3).
+  entries.forEach((entry, index) => {
+    entry.rank = index > 0 && entries[index - 1].score === entry.score ? entries[index - 1].rank : index + 1;
+  });
+  return entries;
+}
+
+function calculateLeaderboard(session) {
+  if (!session) return [];
+  const revealed = session.revealedQuestions;
+  const revealedCount = revealed.filter((r) => r.isRevealed).length;
+  if (revealedCount === 0) return [];
+
   const leaderboard = [];
-  let submissions, revealed, questionsToCheck;
-  
-  if (sessionData) {
-    // Use session-based data
-    submissions = sessionData.scheduledSubmissions;
-    revealed = sessionData.revealedQuestions;
-    questionsToCheck = sessionData.questions;
-  } else {
-    // Legacy fallback - should not be used in session-based architecture
-    return []; // Return empty leaderboard if no session data
-  }
-  
-  const revealedCount = revealed.filter(r => r.isRevealed).length;
-  
-  if (revealedCount === 0) {
-    return [];
-  }
-  
-  submissions.forEach((submission, socketId) => {
+  session.scheduledSubmissions.forEach((submission) => {
     let score = 0;
-    
-    // Calculate score based on revealed questions only
-    submission.answers.forEach(answer => {
+    submission.answers.forEach((answer) => {
       const questionRevealed = revealed[answer.questionIndex]?.isRevealed;
-      if (questionRevealed && answer.selectedOption === questionsToCheck[answer.questionIndex]?.correct) {
+      if (questionRevealed && answer.selectedOption === session.questions[answer.questionIndex]?.correct) {
         score++;
       }
     });
-    
     leaderboard.push({
-      rank: 0, // Will be set after sorting
+      rank: 0,
       participantName: submission.participantName,
-      score: score,
+      score,
       submissionTime: submission.submissionTime,
       questionsRevealed: revealedCount
     });
   });
-  
-  // Sort by score (descending), then by submission time (ascending)
-  leaderboard.sort((a, b) => {
-    if (a.score === b.score) {
-      return a.submissionTime - b.submissionTime;
-    }
-    return b.score - a.score;
-  });
-  
-  // Assign ranks
-  leaderboard.forEach((entry, index) => {
-    entry.rank = index + 1;
-  });
-  
-  return leaderboard;
+
+  leaderboard.sort((a, b) => (a.score === b.score ? a.submissionTime - b.submissionTime : b.score - a.score));
+  return assignRanks(leaderboard);
 }
 
+// Replace any earlier submission from the same participant name (reconnects get a new socket id).
+function storeSubmission(map, socketId, submission) {
+  for (const [id, existing] of map) {
+    if (id !== socketId && sameName(existing.participantName, submission.participantName)) {
+      map.delete(id);
+    }
+  }
+  map.set(socketId, submission);
+}
+
+function findSubmissionByName(map, name) {
+  for (const existing of map.values()) {
+    if (sameName(existing.participantName, name)) return existing;
+  }
+  return null;
+}
+
+// ---------------------------------------------------------------------------
+// Global poll state. The polling pages do not create sessions (they connect
+// with a plain io() client), so there is one live poll per server. Only the
+// socket that created the poll may close it or toggle its results.
+// ---------------------------------------------------------------------------
+let currentPoll = null;
+const pollHistory = [];
+const pollParticipants = new Map(); // socketId -> teamName
+
+function calculatePollResults(poll) {
+  const voteCounts = new Array(poll.options.length).fill(0);
+  const voterNames = {};
+  for (let i = 0; i < poll.options.length; i++) voterNames[i] = [];
+  poll.votes.forEach((optionIndex, teamName) => {
+    if (optionIndex >= 0 && optionIndex < poll.options.length) {
+      voteCounts[optionIndex]++;
+      voterNames[optionIndex].push(teamName);
+    }
+  });
+  return {
+    pollId: poll.id,
+    question: poll.question,
+    options: poll.options,
+    voteCounts,
+    totalVotes: poll.votes.size,
+    voterNames
+  };
+}
+
+// Shape sent over the wire (votes is a Map and would serialize to {}).
+function publicPoll(poll) {
+  if (!poll) return null;
+  return {
+    id: poll.id,
+    question: poll.question,
+    options: poll.options,
+    votes: {},
+    isActive: poll.isActive,
+    showResults: poll.showResults,
+    createdAt: poll.createdAt,
+    closedAt: poll.closedAt
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Server
+// ---------------------------------------------------------------------------
 app.prepare().then(() => {
   const httpServer = createServer((req, res) => {
     const parsedUrl = parse(req.url, true);
     handler(req, res, parsedUrl);
   });
 
-  const io = new Server(httpServer, {
-    cors: {
-      origin: "*",
-      methods: ["GET", "POST"],
-      credentials: true
+  // Same-origin by default. Set APP_ORIGIN (comma separated) to allow others.
+  const allowedOrigins = process.env.APP_ORIGIN ? process.env.APP_ORIGIN.split(',').map((s) => s.trim()) : undefined;
+  const io = new Server(httpServer, allowedOrigins ? { cors: { origin: allowedOrigins, methods: ['GET', 'POST'] } } : {});
+
+  const isHost = (socket, session) => !!session && session.hostSocketId === socket.id;
+  const hostConnected = (session) => !!session.hostSocketId && io.sockets.sockets.has(session.hostSocketId);
+
+  // Build the session snapshot a client receives. Hosts get full questions.
+  function sessionSnapshot(session, { forHost = false, teamName, userInfo } = {}) {
+    const current = session.questions[session.currentQuestion - 1] || null;
+    return {
+      type: session.type,
+      currentQuestion: session.currentQuestion,
+      totalQuestions: session.questions.length,
+      currentQuestionData: forHost ? current : publicQuestion(current),
+      teams: Array.from(session.teams.entries()),
+      scores: Array.from(session.scores.entries()),
+      buzzOrder: session.buzzOrder,
+      canBuzz: session.buzzOrder.length < 3,
+      quizMode: session.quizMode,
+      settings: session.quizSettings,
+      currentPoll: null,
+      pollHistory: [],
+      ...(teamName ? { teamName } : {}),
+      ...(userInfo ? { userInfo } : {}),
+      ...(forHost ? { hostToken: session.hostToken, isHost: true } : {})
+    };
+  }
+
+  function sendError(socket, message) {
+    socket.emit('error', { message });
+  }
+
+  // Resolve the caller's session and require that they are its host.
+  function requireHost(socket, type = 'quiz') {
+    const session = sessionManager.getUserSession(socket.id);
+    if (!session || session.type !== type) {
+      sendError(socket, 'Session not found');
+      return null;
     }
-  });
+    if (!isHost(socket, session)) {
+      sendError(socket, 'Only the host can do that');
+      return null;
+    }
+    return session;
+  }
+
+  function requireParticipantSession(socket, type = 'quiz') {
+    const session = sessionManager.getUserSession(socket.id);
+    if (!session || session.type !== type) {
+      sendError(socket, 'Session not found');
+      return null;
+    }
+    return session;
+  }
+
+  function resetRevealState(session) {
+    session.revealedQuestions = session.questions.map((_, index) => ({
+      questionIndex: index,
+      isRevealed: false,
+      revealedAt: null
+    }));
+  }
+
+  function seatParticipant(session, socket, teamName) {
+    // A returning participant (same name, new socket) replaces their old seat.
+    for (const [id, name] of session.teams) {
+      if (id !== socket.id && sameName(name, teamName)) {
+        session.teams.delete(id);
+        const pending = session.pendingRemovals.get(id);
+        if (pending) clearTimeout(pending);
+        session.pendingRemovals.delete(id);
+        sessionManager.userSessions.delete(id);
+        // Re-key any stored submission to the new socket id.
+        for (const map of [session.basicSubmissions, session.scheduledSubmissions]) {
+          const sub = map.get(id);
+          if (sub) {
+            map.delete(id);
+            sub.socketId = socket.id;
+            map.set(socket.id, sub);
+          }
+        }
+      }
+    }
+    sessionManager.associateUserWithSession(socket.id, session.id);
+    session.teams.set(socket.id, teamName);
+    if (!session.scores.has(teamName)) session.scores.set(teamName, 0);
+    socket.join(`quiz_${session.id}`);
+  }
+
+  function sendModeToParticipant(socket, session) {
+    socket.emit('quiz-mode-set', {
+      mode: session.quizMode,
+      settings: session.quizSettings,
+      questions: publicQuestions(session.questions)
+    });
+    if (session.quizMode === 'buzzer') {
+      socket.emit('question-change', {
+        questionNumber: session.currentQuestion,
+        questionData: publicQuestion(session.questions[session.currentQuestion - 1])
+      });
+    }
+  }
 
   io.on('connection', (socket) => {
     console.log('Client connected:', socket.id);
 
-    // SESSION RECOVERY EVENTS
-    socket.on('recover-session', (data) => {
-      const { sessionId, userInfo } = data;
-      console.log(`Session recovery requested for: ${sessionId}`);
-      
-      const session = sessionManager.getSession(sessionId);
-      if (session) {
-        // Associate user with session
-        sessionManager.associateUserWithSession(socket.id, sessionId);
-        
-        // Restore user to their teams/participants if they were part of it
-        if (userInfo?.teamName) {
-          session.teams.set(socket.id, userInfo.teamName);
-          if (!session.scores.has(userInfo.teamName)) {
-            session.scores.set(userInfo.teamName, 0);
-          }
-          session.pollParticipants.set(socket.id, userInfo.teamName);
-        }
-        
-        // Send session data to client
-        socket.emit('session-recovered', {
-          sessionId: sessionId,
-          sessionData: {
-            type: session.type,
-            currentQuestion: session.currentQuestion,
-            totalQuestions: session.questions.length,
-            currentQuestionData: session.questions[session.currentQuestion - 1] || null,
-            teams: Array.from(session.teams.entries()),
-            scores: Array.from(session.scores.entries()),
-            buzzOrder: session.buzzOrder,
-            canBuzz: session.buzzOrder.length < 3,
-            quizMode: session.quizMode,
-            settings: session.quizSettings,
-            currentPoll: session.currentPoll,
-            pollHistory: session.pollHistory,
-            userInfo: userInfo
-          }
-        });
-        
-        // Join appropriate rooms
-        if (session.type === 'quiz') {
-          socket.join(`quiz_${sessionId}`);
-        } else if (session.type === 'poll') {
-          socket.join(`poll_${sessionId}`);
-        }
-        
-        console.log(`Session recovered successfully: ${sessionId}`);
-      } else {
-        console.log(`Session not found: ${sessionId}`);
-        socket.emit('session-not-found', { sessionId });
-      }
-    });
+    // ---------------- Session lifecycle ----------------
 
-    socket.on('create-session', (data) => {
-      console.log('🔧 Server received create-session request:', data);
-      const { type = 'quiz', userInfo, customSessionId, initialMode = 'buzzer' } = data;
-      
-      // Check if session with this ID already exists
-      if (customSessionId && sessionManager.getSession(customSessionId)) {
-        console.log(`Session ${customSessionId} already exists, not creating duplicate`);
-        const existingSession = sessionManager.getSession(customSessionId);
-        
-        // Associate user with existing session
-        sessionManager.associateUserWithSession(socket.id, customSessionId);
-        
-        // Host joins the session room
-        if (existingSession?.type === 'quiz') {
-          socket.join(`quiz_${customSessionId}`);
-          console.log(`Host joined existing quiz room: quiz_${customSessionId}`);
-        } else if (existingSession?.type === 'poll') {
-          socket.join(`poll_${customSessionId}`);
-        }
-        
-        socket.emit('session-created', {
-          sessionId: customSessionId,
-          sessionData: existingSession
-        });
+    socket.on('create-session', (data = {}) => {
+      const type = data.type === 'poll' ? 'poll' : 'quiz';
+      const initialMode = ['buzzer', 'basic', 'scheduled'].includes(data.initialMode) ? data.initialMode : 'buzzer';
+      const customSessionId = typeof data.customSessionId === 'string' && data.customSessionId.length <= 128
+        ? data.customSessionId
+        : null;
+      const providedToken = data.userInfo && typeof data.userInfo.hostToken === 'string' ? data.userInfo.hostToken : null;
+
+      if (data.customSessionId !== undefined && !customSessionId) {
+        socket.emit('session-creation-error', { error: 'Invalid session id' });
         return;
       }
-      
-      const session = sessionManager.createSession(type, customSessionId, initialMode);
-      
-      // Associate creator with session
-      sessionManager.associateUserWithSession(socket.id, session.id);
-      
-      // Set initial questions (empty - will be set by host)
-      session.questions = [];
-      
-      // Initialize reveal state for scheduled mode
-      session.revealedQuestions = session.questions.map((_, index) => ({
-        questionIndex: index,
-        isRevealed: false,
-        revealedAt: null
-      }));
-      
-      console.log('📤 Server sending session-created event to client:', session.id);
-      
-      // Host joins the session room to receive events
-      if (session.type === 'quiz') {
-        socket.join(`quiz_${session.id}`);
-        console.log(`Host joined quiz room: quiz_${session.id}`);
-      } else if (session.type === 'poll') {
-        socket.join(`poll_${session.id}`);
+
+      const existing = customSessionId ? sessionManager.getSession(customSessionId) : null;
+      if (existing) {
+        // Reclaim is allowed with the host token, or when no host is connected
+        // (e.g. the host's browser crashed and local storage was lost).
+        const mayReclaim = providedToken === existing.hostToken || !hostConnected(existing);
+        if (!mayReclaim) {
+          socket.emit('session-creation-error', { error: 'That session already has a host' });
+          return;
+        }
+        existing.hostSocketId = socket.id;
+        sessionManager.associateUserWithSession(socket.id, existing.id);
+        socket.join(`${existing.type}_${existing.id}`);
+        socket.emit('session-created', {
+          sessionId: existing.id,
+          hostToken: existing.hostToken,
+          sessionData: sessionSnapshot(existing, { forHost: true })
+        });
+        console.log(`Host reclaimed existing session: ${existing.id}`);
+        return;
       }
-      
+
+      const session = sessionManager.createSession(type, customSessionId, initialMode);
+      session.hostSocketId = socket.id;
+      sessionManager.associateUserWithSession(socket.id, session.id);
+      socket.join(`${session.type}_${session.id}`);
+
       socket.emit('session-created', {
         sessionId: session.id,
-        sessionData: {
-          type: session.type,
-          currentQuestion: session.currentQuestion,
-          totalQuestions: session.questions.length,
-          currentQuestionData: session.questions[0] || null,
-          teams: [],
-          scores: [],
-          buzzOrder: [],
-          canBuzz: true,
-          quizMode: session.quizMode,
-          settings: session.quizSettings,
-          currentPoll: session.currentPoll,
-          pollHistory: session.pollHistory
-        }
+        hostToken: session.hostToken,
+        sessionData: sessionSnapshot(session, { forHost: true })
       });
-      
       console.log(`New session created: ${session.id}`);
     });
 
-    socket.on('join-session', (data) => {
-      const { sessionId, teamName } = data;
+    socket.on('recover-session', (data = {}) => {
+      const { sessionId } = data;
+      const userInfo = data.userInfo && typeof data.userInfo === 'object' ? data.userInfo : {};
       const session = sessionManager.getSession(sessionId);
-      
-      if (session) {
-        // Associate user with session
-        sessionManager.associateUserWithSession(socket.id, sessionId);
-        
-        // Add to teams and participants
-        session.teams.set(socket.id, teamName);
-        session.scores.set(teamName, 0);
-        session.pollParticipants.set(socket.id, teamName);
-        
-        // Join room
-        socket.join(`${session.type}_${sessionId}`);
-        
-        // Send session data
-        socket.emit('session-joined', {
-          sessionId: sessionId,
-          sessionData: {
-            type: session.type,
-            currentQuestion: session.currentQuestion,
-            totalQuestions: session.questions.length,
-            currentQuestionData: session.questions[session.currentQuestion - 1] || null,
-            teams: Array.from(session.teams.entries()),
-            scores: Array.from(session.scores.entries()),
-            buzzOrder: session.buzzOrder,
-            canBuzz: session.buzzOrder.length < 3,
-            quizMode: session.quizMode,
-            settings: session.quizSettings,
-            currentPoll: session.currentPoll,
-            pollHistory: session.pollHistory,
-            teamName: teamName
-          }
-        });
-        
-        // Notify others
-        socket.to(`${session.type}_${sessionId}`).emit('participant-joined', {
-          socketId: socket.id,
-          teamName: teamName
-        });
-        
-        console.log(`${teamName} joined session: ${sessionId}`);
-      } else {
+      if (!session) {
         socket.emit('session-not-found', { sessionId });
+        return;
       }
+
+      const claimsHost = userInfo.isHost === true;
+      const tokenMatches = typeof userInfo.hostToken === 'string' && userInfo.hostToken === session.hostToken;
+      const recoverAsHost = tokenMatches || (claimsHost && !hostConnected(session));
+
+      if (recoverAsHost) {
+        session.hostSocketId = socket.id;
+        sessionManager.associateUserWithSession(socket.id, session.id);
+        socket.join(`${session.type}_${session.id}`);
+        socket.emit('session-recovered', {
+          sessionId: session.id,
+          sessionData: sessionSnapshot(session, { forHost: true, userInfo: { ...userInfo, hostToken: session.hostToken, isHost: true } })
+        });
+        console.log(`Host recovered session: ${session.id}`);
+        return;
+      }
+
+      if (claimsHost) {
+        sendError(socket, 'That session already has a connected host');
+        socket.emit('session-not-found', { sessionId });
+        return;
+      }
+
+      const teamName = sanitizeName(userInfo.teamName);
+      if (!teamName) {
+        socket.emit('session-not-found', { sessionId });
+        return;
+      }
+      seatParticipant(session, socket, teamName);
+      socket.emit('session-recovered', {
+        sessionId: session.id,
+        sessionData: sessionSnapshot(session, { teamName, userInfo: { teamName } })
+      });
+      sendModeToParticipant(socket, session);
+      console.log(`Participant ${teamName} recovered session: ${session.id}`);
     });
 
-    // Legacy support removed - clients should join specific sessions
-    // Default question sending is no longer needed with session-based architecture
+    socket.on('join-session', (data = {}) => {
+      const { sessionId } = data;
+      const teamName = sanitizeName(data.teamName);
+      const session = sessionManager.getSession(sessionId);
+      if (!session) {
+        socket.emit('session-not-found', { sessionId });
+        return;
+      }
+      if (!teamName) return sendError(socket, 'A name is required');
+      if (session.type !== 'quiz') return sendError(socket, 'Polls are joined from the polling page');
 
-    // Handle custom questions from host (legacy support - DEPRECATED)
-    socket.on('set-custom-questions', (data) => {
-      console.log('⚠️ Legacy custom questions received - use update-session-questions instead');
-      
-      // Try to update session if available
+      seatParticipant(session, socket, teamName);
+      socket.emit('session-joined', {
+        sessionId: session.id,
+        sessionData: sessionSnapshot(session, { teamName })
+      });
+      socket.to(`quiz_${session.id}`).emit('participant-joined', { socketId: socket.id, teamName });
+      console.log(`${teamName} joined session: ${session.id}`);
+    });
+
+    // Preferred participant join (used by the share link).
+    socket.on('join-quiz-session', (data = {}) => {
+      const { sessionId } = data;
+      const teamName = sanitizeName(data.teamName);
+      const session = sessionManager.getSession(sessionId);
+
+      if (!session || session.type !== 'quiz') {
+        socket.emit('session-join-failed', { sessionId, error: 'Session not found or not available' });
+        return;
+      }
+      if (!teamName) {
+        socket.emit('session-join-failed', { sessionId, error: 'A team name is required' });
+        return;
+      }
+
+      seatParticipant(session, socket, teamName);
+      sendModeToParticipant(socket, session);
+      socket.to(`quiz_${session.id}`).emit('register-team', { socketId: socket.id, teamName });
+      socket.emit('session-joined-successfully', { sessionId, teamName });
+      console.log(`Participant ${teamName} joined quiz session: ${sessionId} (mode: ${session.quizMode})`);
+    });
+
+    // Legacy registration. Only re-registers within the session this socket
+    // already belongs to; it never drops a participant into someone else's quiz.
+    socket.on('register-team', (data = {}) => {
+      const teamName = sanitizeName(data.teamName);
       const session = sessionManager.getUserSession(socket.id);
-      if (session && session.type === 'quiz') {
-        session.questions = data.questions;
-        session.currentQuestion = 1;
-        session.buzzOrder = [];
-        
-        // Initialize reveal state for scheduled mode
-        session.revealedQuestions = session.questions.map((_, index) => ({
-          questionIndex: index,
-          isRevealed: false,
-          revealedAt: null
-        }));
-        
-        // Send updated question to session room only
-        socket.to(`quiz_${session.id}`).emit('question-change', {
-          questionNumber: session.currentQuestion,
-          questionData: session.questions[session.currentQuestion - 1]
-        });
-        
-        socket.emit('question-change', {
-          questionNumber: session.currentQuestion,
-          questionData: session.questions[session.currentQuestion - 1]
-        });
-        
-        console.log(`Questions updated for session ${session.id}: ${data.questions.length} questions`);
-      } else {
-        console.warn('Custom questions received but no session found');
+      if (!session || session.type !== 'quiz') {
+        return sendError(socket, 'Use the join link from your host to join a quiz');
       }
+      if (!teamName) return sendError(socket, 'A team name is required');
+      seatParticipant(session, socket, teamName);
+      sendModeToParticipant(socket, session);
+      socket.to(`quiz_${session.id}`).emit('register-team', { socketId: socket.id, teamName });
     });
 
-    // NEW SESSION-BASED QUESTION MANAGEMENT
-    socket.on('update-session-questions', (data) => {
-      const { sessionId, questions: sessionQuestions } = data;
-      const session = sessionManager.getSession(sessionId);
-      
-      if (session) {
-        console.log(`Updating questions for session ${sessionId}:`, sessionQuestions.length, 'questions');
-        
-        // Store questions in session
-        session.questions = sessionQuestions;
-        session.currentQuestion = 1;
-        session.buzzOrder = [];
-        
-        // Initialize reveal state for scheduled mode
-        session.revealedQuestions = sessionQuestions.map((_, index) => ({
-          questionIndex: index,
-          isRevealed: false,
-          revealedAt: null
-        }));
-        
-        // Notify clients in this session
-        socket.to(`${session.type}_${sessionId}`).emit('session-questions-updated', {
-          questions: sessionQuestions,
-          currentQuestion: 1,
-          currentQuestionData: sessionQuestions[0] || null
-        });
-        
-        // Confirm to sender
-        socket.emit('session-questions-updated', {
-          questions: sessionQuestions,
-          currentQuestion: 1,
-          currentQuestionData: sessionQuestions[0] || null
-        });
-        
-        console.log(`Session ${sessionId} now has ${sessionQuestions.length} questions`);
-      } else {
-        socket.emit('session-not-found', { sessionId });
-      }
+    // ---------------- Questions ----------------
+
+    socket.on('set-custom-questions', (data = {}) => {
+      const session = requireHost(socket);
+      if (!session) return;
+      const questions = normalizeQuestions(data.questions);
+      if (!questions) return sendError(socket, 'Invalid questions payload');
+
+      session.questions = questions;
+      session.currentQuestion = 1;
+      session.buzzOrder = [];
+      resetRevealState(session);
+
+      socket.to(`quiz_${session.id}`).emit('question-change', {
+        questionNumber: 1,
+        questionData: publicQuestion(questions[0])
+      });
+      socket.emit('question-change', { questionNumber: 1, questionData: questions[0] });
     });
 
-    socket.on('get-session-questions', (data) => {
+    socket.on('update-session-questions', (data = {}) => {
       const { sessionId } = data;
       const session = sessionManager.getSession(sessionId);
-      
-      if (session) {
-        socket.emit('session-questions-retrieved', {
-          sessionId,
-          questions: session.questions || [],
-          currentQuestion: session.currentQuestion || 1
-        });
-      } else {
+      if (!session) {
         socket.emit('session-not-found', { sessionId });
+        return;
       }
+      if (!isHost(socket, session)) return sendError(socket, 'Only the host can change the questions');
+
+      const questions = normalizeQuestions(data.questions);
+      if (!questions) return sendError(socket, 'Invalid questions payload');
+
+      // A host reload re-sends the same questions; only reset progress when
+      // the question set actually changed (or a reset is explicitly requested).
+      const changed = JSON.stringify(questions) !== JSON.stringify(session.questions);
+      if (changed || data.reset === true) {
+        session.questions = questions;
+        session.currentQuestion = 1;
+        session.buzzOrder = [];
+        resetRevealState(session);
+      }
+
+      socket.to(`quiz_${session.id}`).emit('session-questions-updated', {
+        questions: publicQuestions(session.questions),
+        currentQuestion: session.currentQuestion,
+        currentQuestionData: publicQuestion(session.questions[session.currentQuestion - 1])
+      });
+      socket.emit('session-questions-updated', {
+        questions: session.questions,
+        currentQuestion: session.currentQuestion,
+        currentQuestionData: session.questions[session.currentQuestion - 1] || null
+      });
+      console.log(`Session ${session.id} has ${session.questions.length} questions${changed ? ' (updated)' : ''}`);
     });
 
-    // NEW MODE SELECTION EVENTS
-    socket.on('set-quiz-mode', (data) => {
-      console.log('Quiz mode set:', data.mode, 'with settings:', data.settings, 'liveQuizId:', data.liveQuizId);
-      
-      // Set mode and settings in session instead of global variables
-      const session = sessionManager.getUserSession(socket.id);
-      if (session) {
-        session.quizMode = data.mode;
-        session.quizSettings = { ...session.quizSettings, ...data.settings };
+    socket.on('get-session-questions', (data = {}) => {
+      const { sessionId } = data;
+      const session = sessionManager.getSession(sessionId);
+      if (!session) {
+        socket.emit('session-not-found', { sessionId });
+        return;
       }
-      
-      // If this is a live quiz, associate the socket with the session
-      if (data.liveQuizId) {
-        sessionManager.associateUserWithSession(socket.id, data.liveQuizId);
-        console.log('Host associated with live quiz session:', data.liveQuizId);
-      }
-      
-      // Mode-specific setup is now handled per session
-      // Global variable cleanup removed - all data is session-based
-      
-      // Send mode to all clients in session instead of global broadcast
-      if (session) {
-        io.to(`quiz_${session.id}`).emit('quiz-mode-set', { 
-          mode: data.mode, 
-          settings: session.quizSettings 
-        });
-      }
+      const forHost = isHost(socket, session);
+      socket.emit('session-questions-retrieved', {
+        sessionId,
+        questions: forHost ? session.questions : publicQuestions(session.questions),
+        currentQuestion: session.currentQuestion || 1
+      });
     });
 
-    // BASIC MODE EVENTS
-    socket.on('submit-basic-quiz', (data) => {
-      console.log('Basic quiz submitted by:', data.participantName);
-      
-      // Use session-based state
-      const session = sessionManager.getUserSession(socket.id);
-      if (session && session.type === 'quiz') {
-        // Calculate score using session questions
-        let score = 0;
-        data.answers.forEach(answer => {
-          if (answer.selectedOption === session.questions[answer.questionIndex]?.correct) {
-            score++;
-          }
-        });
-        
-        const submission = {
-          participantName: data.participantName,
-          socketId: socket.id,
-          answers: data.answers,
-          submissionTime: Date.now(),
-          score: score,
-          isComplete: true
-        };
-        
-        session.basicSubmissions.set(socket.id, submission);
-        
-        // Send results back to participant
-        socket.emit('basic-quiz-submitted', { submission });
-        
-        // Notify host and other participants in session
-        socket.to(`quiz_${session.id}`).emit('basic-quiz-submitted', submission);
-        socket.to(`quiz_${session.id}`).emit('submission-received', { 
-          participantName: data.participantName, 
-          submissionTime: submission.submissionTime 
-        });
-        
-        // Update submission count for session
-        socket.to(`quiz_${session.id}`).emit('submissions-count-update', { 
-          count: session.basicSubmissions.size, 
-          total: session.teams.size 
-        });
-        
-        console.log(`Basic quiz submitted in session ${session.id}: ${data.participantName} (score: ${score})`);
-      } else {
-        console.warn('Basic quiz submission but no session found');
-        socket.emit('error', { message: 'Session not found' });
+    // ---------------- Mode and settings ----------------
+
+    socket.on('set-quiz-mode', (data = {}) => {
+      const session = requireHost(socket);
+      if (!session) return;
+      if (!['buzzer', 'basic', 'scheduled'].includes(data.mode)) return sendError(socket, 'Invalid quiz mode');
+
+      session.quizMode = data.mode;
+      session.quizSettings = { ...session.quizSettings, ...(data.settings && typeof data.settings === 'object' ? data.settings : {}), mode: data.mode };
+
+      socket.to(`quiz_${session.id}`).emit('quiz-mode-set', {
+        mode: session.quizMode,
+        settings: session.quizSettings,
+        questions: publicQuestions(session.questions)
+      });
+      socket.emit('quiz-mode-set', {
+        mode: session.quizMode,
+        settings: session.quizSettings,
+        questions: session.questions
+      });
+    });
+
+    socket.on('quiz-settings-update', (data = {}) => {
+      const session = requireHost(socket);
+      if (!session) return;
+      if (!data.settings || typeof data.settings !== 'object') return sendError(socket, 'Invalid settings');
+      session.quizSettings = { ...session.quizSettings, ...data.settings, mode: session.quizMode };
+      io.to(`quiz_${session.id}`).emit('quiz-settings-updated', { settings: session.quizSettings });
+    });
+
+    // ---------------- Basic mode ----------------
+
+    socket.on('submit-basic-quiz', (data = {}) => {
+      const session = requireParticipantSession(socket);
+      if (!session) return;
+      const participantName = sanitizeName(data.participantName) || session.teams.get(socket.id);
+      if (!participantName) return sendError(socket, 'Join the quiz before submitting');
+      const answers = normalizeAnswers(data.answers, session.questions.length);
+      if (!answers) return sendError(socket, 'Invalid answers payload');
+
+      const previous = session.basicSubmissions.get(socket.id) || findSubmissionByName(session.basicSubmissions, participantName);
+      if (previous && !session.quizSettings.allowRetakes) {
+        return sendError(socket, 'You have already submitted this quiz');
       }
+
+      let score = 0;
+      answers.forEach((answer) => {
+        if (answer.selectedOption === session.questions[answer.questionIndex]?.correct) score++;
+      });
+
+      const submission = {
+        participantName,
+        socketId: socket.id,
+        answers,
+        submissionTime: Date.now(),
+        score,
+        percentage: percentage(score, session.questions.length),
+        passed: passedFor(session, score),
+        isComplete: true
+      };
+      storeSubmission(session.basicSubmissions, socket.id, submission);
+
+      // The participant gets their own result. Correct answers are included
+      // only when the host chose to show them.
+      socket.emit('basic-quiz-submitted', {
+        submission,
+        totalQuestions: session.questions.length,
+        correctAnswers: session.quizSettings.showCorrectAnswers ? session.questions.map((q) => q.correct) : undefined
+      });
+
+      socket.to(`quiz_${session.id}`).emit('basic-quiz-submitted', submission);
+      socket.to(`quiz_${session.id}`).emit('submission-received', {
+        participantName,
+        submissionTime: submission.submissionTime
+      });
+      socket.to(`quiz_${session.id}`).emit('submissions-count-update', {
+        count: session.basicSubmissions.size,
+        total: session.teams.size
+      });
+      console.log(`Basic quiz submitted in session ${session.id}: ${participantName} (score: ${score})`);
     });
 
     socket.on('get-submissions-count', () => {
-      // Use session-based state
       const session = sessionManager.getUserSession(socket.id);
       if (session && session.type === 'quiz') {
-        socket.emit('submissions-count-update', { 
-          count: session.basicSubmissions.size, 
-          total: session.teams.size 
-        });
+        socket.emit('submissions-count-update', { count: session.basicSubmissions.size, total: session.teams.size });
       } else {
         socket.emit('submissions-count-update', { count: 0, total: 0 });
       }
     });
 
     socket.on('get-results-summary', () => {
-      // Use session-based state
-      const session = sessionManager.getUserSession(socket.id);
-      if (session && session.type === 'quiz') {
-        const submissions = Array.from(session.basicSubmissions.values());
-        socket.emit('results-summary', { submissions });
-      } else {
-        socket.emit('results-summary', { submissions: [] });
-      }
+      const session = requireHost(socket);
+      if (!session) return;
+      socket.emit('results-summary', { submissions: Array.from(session.basicSubmissions.values()) });
     });
 
-    socket.on('quiz-settings-update', (data) => {
-      // Use session-based state
-      const session = sessionManager.getUserSession(socket.id);
-      if (session && session.type === 'quiz') {
-        session.quizSettings = { ...session.quizSettings, ...data.settings };
-        
-        // Broadcast to session room only
-        socket.to(`quiz_${session.id}`).emit('quiz-settings-updated', { 
-          settings: session.quizSettings 
-        });
-        
-        console.log(`Quiz settings updated in session ${session.id}`);
-      } else {
-        console.warn('Quiz settings update requested but no session found');
-      }
-    });
+    // ---------------- Scheduled mode ----------------
 
-    // SCHEDULED MODE EVENTS
-    socket.on('submit-answers', (data) => {
-      console.log('Scheduled answers submitted by:', data.participantName);
-      
+    socket.on('submit-answers', (data = {}) => {
+      const session = requireParticipantSession(socket);
+      if (!session) return;
+      const participantName = sanitizeName(data.participantName) || session.teams.get(socket.id);
+      if (!participantName) return sendError(socket, 'Join the quiz before submitting');
+      const answers = normalizeAnswers(data.answers, session.questions.length);
+      if (!answers) return sendError(socket, 'Invalid answers payload');
+
+      const previous = session.scheduledSubmissions.get(socket.id) || findSubmissionByName(session.scheduledSubmissions, participantName);
+      if (previous && !session.quizSettings.allowRetakes) {
+        return sendError(socket, 'You have already submitted this quiz');
+      }
+
       const submission = {
-        participantName: data.participantName,
+        participantName,
         socketId: socket.id,
-        answers: data.answers,
+        answers,
         submissionTime: Date.now(),
-        score: 0, // Will be calculated during reveals
+        score: 0, // calculated at reveal time
         isComplete: true
       };
-      
-      // Check if this is part of a live quiz session
-      const session = sessionManager.getUserSession(socket.id);
-      if (session && session.type === 'quiz') {
-        // Store in session-based submission system
-        session.scheduledSubmissions.set(socket.id, submission);
-        console.log(`Submission stored in session ${session.id} for participant ${data.participantName}`);
-        
-        // Notify clients in the session room
-        socket.emit('submission-stored', { participantName: data.participantName });
-        socket.to(`quiz_${session.id}`).emit('submission-received', { 
-          participantName: data.participantName, 
-          submissionTime: submission.submissionTime 
-        });
-      } else {
-        // Fall back to global state for non-session quizzes
-        scheduledSubmissions.set(socket.id, submission);
-        
-        // Notify participant and host
-        socket.emit('submission-stored', { participantName: data.participantName });
-        io.emit('submission-received', { 
-          participantName: data.participantName, 
-          submissionTime: submission.submissionTime 
-        });
-      }
+      storeSubmission(session.scheduledSubmissions, socket.id, submission);
+
+      socket.emit('submission-stored', { participantName });
+      socket.to(`quiz_${session.id}`).emit('submission-received', {
+        participantName,
+        submissionTime: submission.submissionTime
+      });
+      console.log(`Scheduled submission stored in session ${session.id} for ${participantName}`);
     });
 
-    socket.on('reveal-question', (data) => {
-      const questionIndex = data.questionIndex;
-      
-      // Check if this is part of a live quiz session
-      const session = sessionManager.getUserSession(socket.id);
-      if (session && session.type === 'quiz') {
-        // Use session-based data
-        if (questionIndex < 0 || questionIndex >= session.revealedQuestions.length) return;
-        
-        console.log('Revealing question in session:', questionIndex, 'for session:', session.id);
-        
-        session.revealedQuestions[questionIndex] = {
-          questionIndex,
-          isRevealed: true,
-          revealedAt: Date.now()
-        };
-        
-        // Calculate updated scores and leaderboard using session data
-        const leaderboard = calculateLeaderboard(session);
-        
-        // Broadcast to session room
-        socket.to(`quiz_${session.id}`).emit('question-revealed', { 
-          questionIndex, 
-          correctAnswer: session.questions[questionIndex].correct 
-        });
-        
-        socket.to(`quiz_${session.id}`).emit('leaderboard-updated', { 
-          leaderboard, 
-          visible: session.leaderboardVisible 
-        });
-        
-        // Confirm to host
-        socket.emit('question-revealed', { 
-          questionIndex, 
-          correctAnswer: session.questions[questionIndex].correct 
-        });
-        
-        socket.emit('leaderboard-updated', { 
-          leaderboard, 
-          visible: session.leaderboardVisible 
-        });
-      } else {
-        // Fall back to global state
-        if (questionIndex < 0 || questionIndex >= revealedQuestions.length) return;
-        
-        console.log('Revealing question (global):', questionIndex);
-        
-        revealedQuestions[questionIndex] = {
-          questionIndex,
-          isRevealed: true,
-          revealedAt: Date.now()
-        };
-        
-        // Calculate updated scores and leaderboard
-        const leaderboard = calculateLeaderboard();
-        
-        // Broadcast the reveal
-        io.emit('question-revealed', { 
-          questionIndex, 
-          correctAnswer: questions[questionIndex].correct 
-        });
-        
-        io.emit('leaderboard-updated', { 
-          leaderboard, 
-          visible: leaderboardVisible 
-        });
+    socket.on('reveal-question', (data = {}) => {
+      const session = requireHost(socket);
+      if (!session) return;
+      const questionIndex = Number(data.questionIndex);
+      if (!isInt(questionIndex) || questionIndex < 0 || questionIndex >= session.questions.length) {
+        return sendError(socket, 'Invalid question index');
       }
+      if (session.revealedQuestions.length !== session.questions.length) resetRevealState(session);
+
+      session.revealedQuestions[questionIndex] = { questionIndex, isRevealed: true, revealedAt: Date.now() };
+      const leaderboard = calculateLeaderboard(session);
+      const payload = { questionIndex, correctAnswer: session.questions[questionIndex].correct };
+
+      io.to(`quiz_${session.id}`).emit('question-revealed', payload);
+      io.to(`quiz_${session.id}`).emit('leaderboard-updated', { leaderboard, visible: session.leaderboardVisible });
     });
 
     socket.on('reveal-all', () => {
-      // Check if this is part of a live quiz session
-      const session = sessionManager.getUserSession(socket.id);
-      if (session && session.type === 'quiz') {
-        // Use session-based data
-        console.log('Revealing all questions in session:', session.id);
-        
-        session.revealedQuestions = session.revealedQuestions.map((r, index) => ({
-          questionIndex: index,
-          isRevealed: true,
-          revealedAt: Date.now()
-        }));
-        
-        const leaderboard = calculateLeaderboard(session);
-        
-        // Broadcast to session room
-        socket.to(`quiz_${session.id}`).emit('all-questions-revealed', { leaderboard });
-        socket.to(`quiz_${session.id}`).emit('leaderboard-updated', { 
-          leaderboard, 
-          visible: session.leaderboardVisible 
-        });
-        
-        // Confirm to host
-        socket.emit('all-questions-revealed', { leaderboard });
-        socket.emit('leaderboard-updated', { 
-          leaderboard, 
-          visible: session.leaderboardVisible 
-        });
-      } else {
-        // Fall back to global state
-        console.log('Revealing all questions (global)');
-        
-        revealedQuestions = revealedQuestions.map((r, index) => ({
-          questionIndex: index,
-          isRevealed: true,
-          revealedAt: Date.now()
-        }));
-        
-        const leaderboard = calculateLeaderboard();
-        
-        io.emit('all-questions-revealed', { leaderboard });
-        io.emit('leaderboard-updated', { 
-          leaderboard, 
-          visible: leaderboardVisible 
-        });
-      }
+      const session = requireHost(socket);
+      if (!session) return;
+
+      session.revealedQuestions = session.questions.map((_, index) => ({
+        questionIndex: index,
+        isRevealed: true,
+        revealedAt: Date.now()
+      }));
+      const leaderboard = calculateLeaderboard(session);
+      const correctAnswers = session.questions.map((q) => q.correct);
+
+      io.to(`quiz_${session.id}`).emit('all-questions-revealed', { leaderboard, correctAnswers });
+      io.to(`quiz_${session.id}`).emit('leaderboard-updated', { leaderboard, visible: session.leaderboardVisible });
     });
 
-    socket.on('toggle-leaderboard-visibility', (data) => {
-      // Check if this is part of a live quiz session
-      const session = sessionManager.getUserSession(socket.id);
-      if (session && session.type === 'quiz') {
-        // Use session-based data
-        session.leaderboardVisible = data.visible;
-        console.log('Leaderboard visibility for session:', session.leaderboardVisible);
-        
-        const leaderboard = calculateLeaderboard(session);
-        
-        // Broadcast to session room
-        socket.to(`quiz_${session.id}`).emit('leaderboard-visibility-changed', { 
-          visible: session.leaderboardVisible 
-        });
-        socket.to(`quiz_${session.id}`).emit('leaderboard-updated', { 
-          leaderboard, 
-          visible: session.leaderboardVisible 
-        });
-        
-        // Confirm to host
-        socket.emit('leaderboard-visibility-changed', { visible: session.leaderboardVisible });
-        socket.emit('leaderboard-updated', { 
-          leaderboard, 
-          visible: session.leaderboardVisible 
-        });
-      } else {
-        // Fall back to global state
-        leaderboardVisible = data.visible;
-        console.log('Leaderboard visibility (global):', leaderboardVisible);
-        
-        const leaderboard = calculateLeaderboard();
-        
-        io.emit('leaderboard-visibility-changed', { visible: leaderboardVisible });
-        io.emit('leaderboard-updated', { 
-          leaderboard, 
-          visible: leaderboardVisible 
-        });
-      }
+    socket.on('toggle-leaderboard-visibility', (data = {}) => {
+      const session = requireHost(socket);
+      if (!session) return;
+      session.leaderboardVisible = data.visible === true;
+      const leaderboard = calculateLeaderboard(session);
+
+      io.to(`quiz_${session.id}`).emit('leaderboard-visibility-changed', { visible: session.leaderboardVisible });
+      io.to(`quiz_${session.id}`).emit('leaderboard-updated', { leaderboard, visible: session.leaderboardVisible });
     });
 
     socket.on('get-leaderboard-status', () => {
-      // Check if this is part of a live quiz session
       const session = sessionManager.getUserSession(socket.id);
-      if (session && session.type === 'quiz') {
-        // Use session-based data
-        const leaderboard = calculateLeaderboard(session);
-        socket.emit('leaderboard-updated', { 
-          leaderboard, 
-          visible: session.leaderboardVisible 
-        });
-      } else {
-        // Fall back to global state
-        const leaderboard = calculateLeaderboard();
-        socket.emit('leaderboard-updated', { 
-          leaderboard, 
-          visible: leaderboardVisible 
-        });
+      if (!session || session.type !== 'quiz') {
+        return socket.emit('leaderboard-updated', { leaderboard: [], visible: false });
       }
+      const leaderboard = isHost(socket, session) || session.leaderboardVisible ? calculateLeaderboard(session) : [];
+      socket.emit('leaderboard-updated', { leaderboard, visible: session.leaderboardVisible });
     });
 
-    socket.on('send-announcement', (data) => {
-      const announcement = {
-        message: data.message,
-        timestamp: Date.now()
-      };
-      
-      announcements.push(announcement);
-      
-      // Keep only last 10 announcements  
-      if (announcements.length > 10) {
-        announcements.shift();
-      }
-      
-      io.emit('announcement', announcement);
+    socket.on('send-announcement', (data = {}) => {
+      const session = requireHost(socket);
+      if (!session) return;
+      const message = sanitizeText(data.message, MAX_ANNOUNCEMENT_LENGTH);
+      if (!message) return sendError(socket, 'Announcement cannot be empty');
+
+      const announcement = { message, timestamp: Date.now() };
+      session.announcements.push(announcement);
+      if (session.announcements.length > 10) session.announcements.shift();
+      io.to(`quiz_${session.id}`).emit('announcement', announcement);
     });
 
     socket.on('get-all-submissions', () => {
-      // Check if this is part of a live quiz session
-      const session = sessionManager.getUserSession(socket.id);
-      if (session && session.type === 'quiz') {
-        // Use session-based submissions
-        const submissions = Array.from(session.scheduledSubmissions.values());
-        console.log('Returning session submissions count:', submissions.length);
-        socket.emit('all-submissions', { 
-          submissions, 
-          revealedQuestions: session.revealedQuestions || [] 
-        });
-      } else {
-        // Fall back to global state
-        const submissions = Array.from(scheduledSubmissions.values());
-        console.log('Returning global submissions count:', submissions.length);
-        socket.emit('all-submissions', { submissions, revealedQuestions });
-      }
-    });
-
-    // NEW: Session-specific participant joining (preferred method)
-    socket.on('join-quiz-session', (data) => {
-      const { sessionId, teamName } = data;
-      console.log(`Participant ${teamName} requesting to join session: ${sessionId}`);
-      
-      const session = sessionManager.getSession(sessionId);
-      if (session && session.type === 'quiz') {
-        // Associate user with specific session
-        sessionManager.associateUserWithSession(socket.id, sessionId);
-        session.teams.set(socket.id, teamName);
-        session.scores.set(teamName, 0);
-        
-        // Join the session room
-        socket.join(`quiz_${sessionId}`);
-        
-        console.log(`✅ Participant ${teamName} joined quiz session: ${sessionId} (mode: ${session.quizMode})`);
-        
-        // Send session-specific quiz mode and questions
-        socket.emit('quiz-mode-set', {
-          mode: session.quizMode,
-          settings: session.quizSettings,
-          questions: session.questions
-        });
-        
-        // Send current question for buzzer mode
-        if (session.quizMode === 'buzzer') {
-          socket.emit('question-change', {
-            questionNumber: session.currentQuestion,
-            questionData: session.questions[session.currentQuestion - 1] || null
-          });
-        }
-        
-        // Notify other clients in the session
-        socket.to(`quiz_${sessionId}`).emit('register-team', { 
-          socketId: socket.id, 
-          teamName: teamName 
-        });
-        
-        // Confirm successful join
-        socket.emit('session-joined-successfully', { sessionId, teamName });
-      } else {
-        console.warn(`Session not found or not a quiz: ${sessionId}`);
-        socket.emit('session-join-failed', { 
-          sessionId, 
-          error: 'Session not found or not available' 
-        });
-      }
-    });
-
-    // LEGACY: Generic team registration (fallback for compatibility)
-    socket.on('register-team', (data) => {
-      console.log('Team registered (legacy mode):', data.teamName);
-      
-      // Check if there's an active quiz session to join
-      const quizSessions = sessionManager.getAllSessions().filter(s => s.type === 'quiz');
-      if (quizSessions.length > 0) {
-        // Join the most recent quiz session
-        const latestSession = quizSessions.sort((a, b) => b.lastActivity - a.lastActivity)[0];
-        sessionManager.associateUserWithSession(socket.id, latestSession.id);
-        latestSession.teams.set(socket.id, data.teamName);
-        latestSession.scores.set(data.teamName, 0);
-        
-        // Join the session room
-        socket.join(`quiz_${latestSession.id}`);
-        
-        console.log(`Participant ${data.teamName} joined quiz session: ${latestSession.id} (mode: ${latestSession.quizMode})`);
-        
-        // Send session-specific quiz mode and questions
-        console.log(`📤 Sending session mode to participant: ${latestSession.quizMode}`);
-        socket.emit('quiz-mode-set', {
-          mode: latestSession.quizMode,
-          settings: latestSession.quizSettings,
-          questions: latestSession.questions
-        });
-        
-        // Send current question for buzzer mode
-        if (latestSession.quizMode === 'buzzer') {
-          socket.emit('question-change', {
-            questionNumber: latestSession.currentQuestion,
-            questionData: latestSession.questions[latestSession.currentQuestion - 1] || null
-          });
-        }
-        
-        // Notify other clients in the session
-        socket.to(`quiz_${latestSession.id}`).emit('register-team', { 
-          socketId: socket.id, 
-          teamName: data.teamName 
-        });
-      } else {
-        // No active sessions - this shouldn't happen with new architecture
-        console.warn('No active quiz sessions found for participant registration');
-        socket.emit('error', { message: 'No active quiz sessions available' });
-      }
-    });
-
-    socket.on('question-change', (data) => {
-      // Use session-based state instead of global
-      const session = sessionManager.getUserSession(socket.id);
-      if (session && session.type === 'quiz') {
-        session.currentQuestion = data.questionNumber;
-        session.buzzOrder = []; // Reset buzz order for new question
-        
-        // Broadcast to session room only
-        socket.to(`quiz_${session.id}`).emit('question-change', {
-          questionNumber: session.currentQuestion,
-          questionData: session.questions[session.currentQuestion - 1]
-        });
-        
-        // Confirm to host
-        socket.emit('question-change', {
-          questionNumber: session.currentQuestion,
-          questionData: session.questions[session.currentQuestion - 1]
-        });
-        
-        console.log(`Question changed to ${session.currentQuestion} in session ${session.id}`);
-      } else {
-        console.warn('Question change requested but no session found');
-      }
-    });
-
-    socket.on('buzz', (data) => {
-      const teamName = data.teamName;
-      // Use session-based state instead of global
-      const session = sessionManager.getUserSession(socket.id);
-      if (session && session.type === 'quiz') {
-        if (!session.buzzOrder.includes(teamName)) {
-          session.buzzOrder.push(teamName);
-          const rank = session.buzzOrder.length;
-          
-          const buzzData = {
-            teamName: teamName,
-            timestamp: data.timestamp,
-            rank: rank,
-            socketId: socket.id,
-            totalResponses: session.buzzOrder.length
-          };
-          
-          // Broadcast to session room only
-          socket.to(`quiz_${session.id}`).emit('buzz', buzzData);
-          socket.emit('buzz', buzzData); // Confirm to buzzer
-          
-          console.log(`Buzz from ${teamName} in session ${session.id} (rank: ${rank})`);
-        }
-      } else {
-        console.warn('Buzz received but no session found');
-      }
-    });
-
-    socket.on('reset-buzzer', () => {
-      // Use session-based state instead of global
-      const session = sessionManager.getUserSession(socket.id);
-      if (session && session.type === 'quiz') {
-        session.buzzOrder = [];
-        
-        // Broadcast to session room only
-        socket.to(`quiz_${session.id}`).emit('reset-buzzer');
-        socket.emit('reset-buzzer'); // Confirm to host
-        
-        console.log(`Buzzer reset in session ${session.id}`);
-      } else {
-        console.warn('Buzzer reset requested but no session found');
-      }
-    });
-
-    socket.on('trigger-celebration', (data) => {
-      // Use session-based broadcasting instead of global
-      const session = sessionManager.getUserSession(socket.id);
-      if (session && session.type === 'quiz') {
-        // Broadcast to session room only
-        socket.to(`quiz_${session.id}`).emit('celebrate', { teamName: data.teamName });
-        socket.emit('celebrate', { teamName: data.teamName }); // Confirm to host
-        
-        console.log(`Celebration triggered for ${data.teamName} in session ${session.id}`);
-      } else {
-        console.warn('Celebration requested but no session found');
-      }
-    });
-
-    socket.on('answer-revealed', (data) => {
-      // Use session-based broadcasting instead of global
-      const session = sessionManager.getUserSession(socket.id);
-      if (session && session.type === 'quiz') {
-        // Broadcast to session room only
-        socket.to(`quiz_${session.id}`).emit('answer-revealed', data);
-        
-        console.log(`Answer revealed in session ${session.id}`);
-      } else {
-        console.warn('Answer reveal requested but no session found');
-      }
-    });
-
-    socket.on('disconnect', () => {
-      console.log('Client disconnected:', socket.id);
-      
-      // Session-based cleanup
-      const session = sessionManager.getUserSession(socket.id);
-      if (session) {
-        const teamName = session.teams.get(socket.id);
-        
-        // Don't remove from session immediately - keep for recovery
-        // Just notify others about disconnect
-        if (teamName) {
-          socket.to(`${session.type}_${session.id}`).emit('participant-disconnected', {
-            socketId: socket.id,
-            teamName: teamName
-          });
-        }
-        
-        console.log(`User disconnected from session ${session.id}, but session data preserved for recovery`);
-      }
-      
-      // Legacy cleanup removed - all cleanup now handled by session manager
-    });
-
-    // Handle request for current question number
-    socket.on('request-question-number', () => {
-      const session = sessionManager.getUserSession(socket.id);
-      if (session && session.questions.length > 0) {
-        socket.emit('question-change', {
-          questionNumber: session.currentQuestion,
-          questionData: session.questions[session.currentQuestion - 1]
-        });
-      }
-    });
-
-    // Handle host exit quiz
-    socket.on('host-exit-quiz', () => {
-      console.log('Host is exiting quiz, notifying all participants');
-      
-      // Legacy reset removed - quiz state now managed per session
-      
-      // Notify all participants that the quiz has ended
-      io.emit('quiz-ended', {
-        message: 'The quiz has been ended by the host.'
+      const session = requireHost(socket);
+      if (!session) return;
+      socket.emit('all-submissions', {
+        submissions: Array.from(session.scheduledSubmissions.values()),
+        revealedQuestions: session.revealedQuestions || []
       });
     });
 
-    // POLLING EVENTS
+    // ---------------- Buzzer mode ----------------
 
-    // Register participant for polling
-    socket.on('register-participant', (data) => {
-      console.log('Participant registered for polling:', data.teamName);
-      pollParticipants.set(socket.id, data.teamName);
-      
-      // Send current poll if exists
-      if (currentPoll) {
-        socket.emit('poll-created', currentPoll);
+    socket.on('question-change', (data = {}) => {
+      const session = requireHost(socket);
+      if (!session) return;
+      const questionNumber = Number(data.questionNumber);
+      if (!isInt(questionNumber) || questionNumber < 1 || questionNumber > Math.max(session.questions.length, 1)) {
+        return sendError(socket, 'Invalid question number');
       }
+      session.currentQuestion = questionNumber;
+      session.buzzOrder = [];
+      const question = session.questions[questionNumber - 1] || null;
+
+      socket.to(`quiz_${session.id}`).emit('question-change', { questionNumber, questionData: publicQuestion(question) });
+      socket.emit('question-change', { questionNumber, questionData: question });
     });
 
-    // Create new poll
-    socket.on('create-poll', (data) => {
-      console.log('Creating new poll:', data.question);
-      
+    socket.on('buzz', (data = {}) => {
+      const session = requireParticipantSession(socket);
+      if (!session) return;
+      // Trust the seat, not the payload, for who buzzed.
+      const teamName = session.teams.get(socket.id) || sanitizeName(data.teamName);
+      if (!teamName) return sendError(socket, 'Join the quiz before buzzing');
+      if (session.buzzOrder.includes(teamName)) return;
+
+      session.buzzOrder.push(teamName);
+      const buzzData = {
+        teamName,
+        timestamp: isInt(data.timestamp) ? data.timestamp : Date.now(),
+        rank: session.buzzOrder.length,
+        socketId: socket.id,
+        totalResponses: session.buzzOrder.length
+      };
+      io.to(`quiz_${session.id}`).emit('buzz', buzzData);
+    });
+
+    socket.on('reset-buzzer', () => {
+      const session = requireHost(socket);
+      if (!session) return;
+      session.buzzOrder = [];
+      io.to(`quiz_${session.id}`).emit('reset-buzzer');
+    });
+
+    socket.on('trigger-celebration', (data = {}) => {
+      const session = requireHost(socket);
+      if (!session) return;
+      const teamName = sanitizeName(data.teamName);
+      if (!teamName) return;
+      io.to(`quiz_${session.id}`).emit('celebrate', { teamName });
+    });
+
+    socket.on('answer-revealed', (data = {}) => {
+      const session = requireHost(socket);
+      if (!session) return;
+      const revealedAnswer = Number(data.revealedAnswer);
+      if (!isInt(revealedAnswer) || revealedAnswer < 0 || revealedAnswer > 3) return sendError(socket, 'Invalid answer index');
+      socket.to(`quiz_${session.id}`).emit('answer-revealed', { revealedAnswer });
+    });
+
+    socket.on('request-question-number', () => {
+      const session = sessionManager.getUserSession(socket.id);
+      if (!session || session.questions.length === 0) return;
+      const question = session.questions[session.currentQuestion - 1] || null;
+      socket.emit('question-change', {
+        questionNumber: session.currentQuestion,
+        questionData: isHost(socket, session) ? question : publicQuestion(question)
+      });
+    });
+
+    socket.on('host-exit-quiz', () => {
+      const session = requireHost(socket);
+      if (!session) return;
+      console.log(`Host ended session ${session.id}`);
+      io.to(`quiz_${session.id}`).emit('quiz-ended', { message: 'The quiz has been ended by the host.' });
+      io.in(`quiz_${session.id}`).socketsLeave(`quiz_${session.id}`);
+      sessionManager.deleteSession(session.id);
+    });
+
+    // ---------------- Polling ----------------
+
+    socket.on('register-participant', (data = {}) => {
+      const teamName = sanitizeName(data.teamName);
+      if (!teamName) return sendError(socket, 'A name is required');
+      pollParticipants.set(socket.id, teamName);
+      if (currentPoll) socket.emit('poll-created', publicPoll(currentPoll));
+    });
+
+    socket.on('create-poll', (data = {}) => {
+      const question = sanitizeText(data.question);
+      const options = Array.isArray(data.options)
+        ? data.options.map((o) => sanitizeText(o, 200)).filter(Boolean).slice(0, MAX_POLL_OPTIONS)
+        : [];
+      if (!question || options.length < 2) return sendError(socket, 'A poll needs a question and at least two options');
+
+      // Only the creator of the current poll may replace it while it is active.
+      if (currentPoll && currentPoll.isActive && currentPoll.hostSocketId !== socket.id && io.sockets.sockets.has(currentPoll.hostSocketId)) {
+        return sendError(socket, 'Another host has an active poll running');
+      }
+
+      const id = typeof data.id === 'string' && data.id.length <= 128 ? data.id : Date.now().toString();
       currentPoll = {
-        id: Date.now().toString(),
-        question: data.question,
-        options: data.options,
+        id,
+        hostSocketId: socket.id,
+        question,
+        options,
         votes: new Map(),
         isActive: true,
-        showResults: false,
+        showResults: data.showResults === true,
         createdAt: Date.now()
       };
-
-      // Broadcast new poll to all clients
-      io.emit('poll-created', currentPoll);
+      io.emit('poll-created', publicPoll(currentPoll));
     });
 
-    // Cast vote
-    socket.on('cast-vote', (data) => {
-      if (!currentPoll || !currentPoll.isActive) {
-        socket.emit('error', { message: 'No active poll' });
-        return;
-      }
-
+    socket.on('cast-vote', (data = {}) => {
+      if (!currentPoll || !currentPoll.isActive) return sendError(socket, 'No active poll');
       const teamName = pollParticipants.get(socket.id);
-      if (!teamName) {
-        socket.emit('error', { message: 'Not registered as participant' });
-        return;
+      if (!teamName) return sendError(socket, 'Not registered as participant');
+      if (currentPoll.votes.has(teamName)) return sendError(socket, 'Already voted');
+      const optionIndex = Number(data.optionIndex);
+      if (!isInt(optionIndex) || optionIndex < 0 || optionIndex >= currentPoll.options.length) {
+        return sendError(socket, 'Invalid option');
       }
 
-      // Check if already voted
-      if (currentPoll.votes.has(teamName)) {
-        socket.emit('error', { message: 'Already voted' });
-        return;
-      }
-
-      // Record vote
-      currentPoll.votes.set(teamName, data.optionIndex);
-      
-      // Create vote data
-      const voteData = {
-        pollId: currentPoll.id,
-        teamName: teamName,
-        optionIndex: data.optionIndex,
-        timestamp: Date.now()
-      };
-
-      // Confirm vote to voter
-      socket.emit('vote-cast', voteData);
-
-      // Send updated poll data to all clients
-      const pollUpdate = {
-        poll: currentPoll,
-        results: calculatePollResults(currentPoll)
-      };
-      
-      io.emit('poll-updated', pollUpdate);
+      currentPoll.votes.set(teamName, optionIndex);
+      socket.emit('vote-cast', { pollId: currentPoll.id, teamName, optionIndex, timestamp: Date.now() });
+      io.emit('poll-updated', { poll: publicPoll(currentPoll), results: calculatePollResults(currentPoll) });
     });
 
-    // Close poll
     socket.on('close-poll', (pollId) => {
-      if (currentPoll && currentPoll.id === pollId) {
-        currentPoll.isActive = false;
-        currentPoll.closedAt = Date.now();
-        
-        // Add to history
-        pollHistory.unshift({ ...currentPoll });
-        
-        // Send final results
-        const results = calculatePollResults(currentPoll);
-        io.emit('poll-closed', results);
-      }
+      if (!currentPoll || currentPoll.id !== pollId) return;
+      if (currentPoll.hostSocketId !== socket.id) return sendError(socket, 'Only the poll host can close it');
+      currentPoll.isActive = false;
+      currentPoll.closedAt = Date.now();
+      pollHistory.unshift({ ...currentPoll });
+      if (pollHistory.length > 50) pollHistory.pop();
+      io.emit('poll-closed', calculatePollResults(currentPoll));
     });
 
-    // Toggle results visibility
     socket.on('toggle-results', (pollId) => {
-      if (currentPoll && currentPoll.id === pollId) {
-        currentPoll.showResults = !currentPoll.showResults;
-        
-        const pollUpdate = {
-          poll: currentPoll,
-          results: calculatePollResults(currentPoll)
-        };
-        
-        io.emit('poll-updated', pollUpdate);
-      }
+      if (!currentPoll || currentPoll.id !== pollId) return;
+      if (currentPoll.hostSocketId !== socket.id) return sendError(socket, 'Only the poll host can show results');
+      currentPoll.showResults = !currentPoll.showResults;
+      io.emit('poll-updated', { poll: publicPoll(currentPoll), results: calculatePollResults(currentPoll) });
     });
 
-    // Request current poll
     socket.on('request-current-poll', () => {
-      if (currentPoll) {
-        socket.emit('poll-created', currentPoll);
-        
-        const pollUpdate = {
-          poll: currentPoll,
-          results: calculatePollResults(currentPoll)
-        };
-        
-        socket.emit('poll-updated', pollUpdate);
-      }
+      if (!currentPoll) return;
+      socket.emit('poll-created', publicPoll(currentPoll));
+      socket.emit('poll-updated', { poll: publicPoll(currentPoll), results: calculatePollResults(currentPoll) });
     });
 
-    // Disconnect handling is managed by the session-based handler above
+    // ---------------- Disconnect ----------------
+
+    socket.on('disconnect', () => {
+      console.log('Client disconnected:', socket.id);
+      pollParticipants.delete(socket.id);
+
+      const session = sessionManager.getUserSession(socket.id);
+      if (!session) return;
+
+      if (isHost(socket, session)) {
+        // Keep the session so the host can reclaim it; participants are told nothing.
+        console.log(`Host disconnected from session ${session.id}; waiting for reclaim`);
+        return;
+      }
+
+      const teamName = session.teams.get(socket.id);
+      if (teamName) {
+        socket.to(`${session.type}_${session.id}`).emit('participant-disconnected', { socketId: socket.id, teamName });
+        socket.to(`${session.type}_${session.id}`).emit('disconnect-team', socket.id);
+
+        // Give the participant a grace period to reconnect before freeing the seat.
+        const timeout = setTimeout(() => {
+          if (session.teams.get(socket.id) === teamName) {
+            sessionManager.removeUserFromSession(socket.id);
+            console.log(`Removed ${teamName} from session ${session.id} after grace period`);
+          }
+        }, DISCONNECT_GRACE_MS);
+        session.pendingRemovals.set(socket.id, timeout);
+      } else {
+        sessionManager.userSessions.delete(socket.id);
+      }
+    });
   });
-
-  // Helper function to calculate poll results
-  function calculatePollResults(poll) {
-    const voteCounts = new Array(poll.options.length).fill(0);
-    const voterNames = {};
-    
-    // Initialize voter names arrays
-    for (let i = 0; i < poll.options.length; i++) {
-      voterNames[i] = [];
-    }
-    
-    // Count votes and collect voter names
-    poll.votes.forEach((optionIndex, teamName) => {
-      if (optionIndex >= 0 && optionIndex < poll.options.length) {
-        voteCounts[optionIndex]++;
-        voterNames[optionIndex].push(teamName);
-      }
-    });
-
-    return {
-      pollId: poll.id,
-      question: poll.question,
-      options: poll.options,
-      voteCounts,
-      totalVotes: poll.votes.size,
-      voterNames
-    };
-  }
 
   httpServer.listen(port, () => {
     console.log(`> Ready on http://${hostname}:${port}`);

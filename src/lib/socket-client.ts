@@ -22,6 +22,12 @@ class SocketClient {
   }
 
   public connect(url?: string, config?: SocketClientConfig): Socket<ServerToClientEvents, ClientToServerEvents> {
+
+    if (typeof window === 'undefined') {
+
+      throw new Error('SocketClient is browser-only and must not be used during server rendering');
+
+    }
     // Always create a fresh socket if previous one is disconnected or null
     if (!this.socket || !this.socket.connected) {
       if (this.socket) {

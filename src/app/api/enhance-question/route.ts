@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { generateObject } from 'ai';
 import { openai } from '@ai-sdk/openai';
 import { z } from 'zod';
+import { requireUser, rateLimit } from '@/lib/server-auth';
 
 // Define the schema for enhanced questions
 const EnhancedQuestionSchema = z.object({
@@ -19,6 +20,11 @@ const enhancementPrompts = {
 };
 
 export async function POST(request: NextRequest) {
+  const auth = await requireUser(request);
+  if (auth instanceof NextResponse) return auth;
+  const limited = rateLimit(`${auth.userId}:${request.nextUrl.pathname}`, 20);
+  if (limited) return limited;
+
   try {
     const { question, enhancementType } = await request.json();
 
@@ -37,7 +43,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate question structure
-    if (!question.text || !Array.isArray(question.options) || question.options.length !== 4 || typeof question.correct !== 'number') {
+    if (typeof question.text !== 'string' || question.text.length > 500 || !Array.isArray(question.options) || question.options.length !== 4 || !question.options.every((o: unknown) => typeof o === 'string' && o.length <= 500) || !Number.isInteger(question.correct) || question.correct < 0 || question.correct > 3) {
       return NextResponse.json(
         { error: 'Invalid question format' },
         { status: 400 }

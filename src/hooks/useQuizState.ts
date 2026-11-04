@@ -1,8 +1,9 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { QuizState, QuizQuestion, RankingData } from '@/types/quiz';
 
-// Module-level variable to track current session ID for saving
+// Module-level variables to track the current session for saving
 let savedSessionIdForPersistence: string | null = null;
+let savedHostTokenForPersistence: string | null = null;
 
 // Get custom questions from sessionStorage if available
 const getCustomQuestions = (): QuizQuestion[] => {
@@ -22,7 +23,7 @@ const getCustomQuestions = (): QuizQuestion[] => {
 };
 
 // Save quiz state to localStorage
-const saveQuizState = (state: QuizState, sessionId?: string) => {
+const saveQuizState = (state: QuizState, sessionId?: string, hostToken?: string | null) => {
   if (typeof window !== 'undefined' && state.isHost) {
     try {
       const stateToSave = {
@@ -34,6 +35,7 @@ const saveQuizState = (state: QuizState, sessionId?: string) => {
         mode: state.mode,
         settings: state.settings,
         sessionId: sessionId,
+        hostToken: hostToken || undefined,
         timestamp: Date.now()
       };
       console.log('💾 Saving to localStorage with sessionId:', sessionId, 'Full state:', stateToSave);
@@ -52,7 +54,7 @@ const saveQuizState = (state: QuizState, sessionId?: string) => {
 };
 
 // Get saved quiz state from localStorage
-const getSavedQuizState = (): { state: Partial<QuizState>; sessionId: string | null } | null => {
+const getSavedQuizState = (): { state: Partial<QuizState>; sessionId: string | null; hostToken: string | null } | null => {
   if (typeof window !== 'undefined') {
     try {
       const stored = localStorage.getItem('buzzer_quiz_state');
@@ -70,7 +72,8 @@ const getSavedQuizState = (): { state: Partial<QuizState>; sessionId: string | n
               mode: parsed.mode || 'buzzer',
               settings: parsed.settings || initialState.settings
             },
-            sessionId: parsed.sessionId || null
+            sessionId: parsed.sessionId || null,
+            hostToken: parsed.hostToken || null
           };
         } else {
           localStorage.removeItem('buzzer_quiz_state');
@@ -118,6 +121,7 @@ export function useQuizState(isHost: boolean = false) {
   // Get saved data only after hydration
   const savedData = isHydrated && isHost ? getSavedQuizState() : null;
   const savedSessionId = savedData?.sessionId || null;
+  const savedHostToken = savedData?.hostToken || null;
   
   const [quizState, setQuizState] = useState<QuizState>(() => {
     return {
@@ -334,36 +338,19 @@ export function useQuizState(isHost: boolean = false) {
 
   // Use module-level variable to track sessionId
   
-  const saveCurrentSession = useCallback((sessionId: string) => {
-    console.log('💾 saveCurrentSession called with sessionId:', sessionId, 'isHost:', isHost);
+  // Keep the latest state in a ref so saveCurrentSession has a stable identity
+  // (page effects depend on it; a new identity per render caused duplicate
+  // create-session requests).
+  const latestStateRef = useRef(quizState);
+  latestStateRef.current = quizState;
+
+  const saveCurrentSession = useCallback((sessionId: string, hostToken?: string) => {
     if (isHost && sessionId && sessionId !== 'undefined') {
-      savedSessionIdForPersistence = sessionId; // Store for future saves
-      console.log('💾 Saving quiz state to localStorage with session:', sessionId);
-      saveQuizState(quizState, sessionId);
-      
-      // Verify the save worked
-      try {
-        const saved = localStorage.getItem('buzzer_quiz_state');
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          console.log('✅ Successfully saved session ID to localStorage:', parsed.sessionId);
-        } else {
-          console.error('❌ Failed to save to localStorage - no data found');
-        }
-      } catch (e) {
-        console.error('❌ Error verifying localStorage save:', e);
-      }
+      savedSessionIdForPersistence = sessionId;
+      if (hostToken) savedHostTokenForPersistence = hostToken;
+      saveQuizState(latestStateRef.current, sessionId, savedHostTokenForPersistence);
     }
-  }, [isHost, quizState]);
-  
-  // Simple function to save state when we have a session ID
-  const saveStateIfSessionExists = useCallback((stateToSave?: QuizState) => {
-    const state = stateToSave || quizState;
-    if (isHost && savedSessionIdForPersistence) {
-      console.log('💾 Saving state with sessionId:', savedSessionIdForPersistence);
-      saveQuizState(state, savedSessionIdForPersistence);
-    }
-  }, [isHost, quizState]);
+  }, [isHost]);
 
   return {
     quizState,
@@ -378,5 +365,6 @@ export function useQuizState(isHost: boolean = false) {
     clearSavedState,
     saveCurrentSession,
     savedSessionId,
+    savedHostToken,
   };
 }

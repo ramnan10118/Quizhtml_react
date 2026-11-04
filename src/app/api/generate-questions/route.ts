@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { generateObject } from 'ai';
 import { openai } from '@ai-sdk/openai';
 import { z } from 'zod';
+import { requireUser, rateLimit } from '@/lib/server-auth';
 import { logTopicToSheets } from '@/lib/sheets';
 import { randomUUID } from 'crypto';
 
@@ -15,6 +16,11 @@ const QuestionSchema = z.object({
 });
 
 export async function POST(request: NextRequest) {
+  const auth = await requireUser(request);
+  if (auth instanceof NextResponse) return auth;
+  const limited = rateLimit(`${auth.userId}:${request.nextUrl.pathname}`, 20);
+  if (limited) return limited;
+
   const sessionId = randomUUID();
   const timestamp = new Date().toISOString();
   let topic = 'Unknown';
@@ -34,7 +40,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (questionCount < 1 || questionCount > 20) {
+    if (typeof topic !== 'string' || topic.trim().length === 0 || topic.length > 200) {
+      return NextResponse.json({ error: 'Topic must be between 1 and 200 characters' }, { status: 400 });
+    }
+    if (!['Easy', 'Medium', 'Hard'].includes(difficulty)) {
+      return NextResponse.json({ error: 'Difficulty must be Easy, Medium or Hard' }, { status: 400 });
+    }
+
+    if (!Number.isInteger(questionCount) || questionCount < 1 || questionCount > 20) {
       return NextResponse.json(
         { error: 'Question count must be between 1 and 20' },
         { status: 400 }

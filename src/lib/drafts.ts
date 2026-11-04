@@ -475,7 +475,7 @@ export const liveQuizzes = {
       .eq('id', id)
       .eq('user_id', user.id)
       .eq('type', 'quiz')
-      .eq('status', 'live')
+      .in('status', ['live', 'completed'])
       .single()
 
     if (error) {
@@ -527,7 +527,6 @@ export const liveQuizzes = {
       .eq('id', id)
       .eq('user_id', user.id)
       .eq('type', 'quiz')
-      .eq('status', 'live')
 
     if (error) throw error
   },
@@ -543,7 +542,6 @@ export const liveQuizzes = {
       .eq('id', id)
       .eq('user_id', user.id)
       .eq('type', 'quiz')
-      .eq('status', 'live')
 
     if (error) throw error
   },

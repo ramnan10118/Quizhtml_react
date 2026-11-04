@@ -1,6 +1,7 @@
 'use client';
 
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
+import type { Socket } from 'socket.io-client';
 import { useSessionRecovery } from '@/hooks/useSessionRecovery';
 // import { useSocket } from '@/hooks/useSocket';
 import SocketClient from '@/lib/socket-client';
@@ -31,16 +32,22 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   const [isInitialized, setIsInitialized] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
   
-  // Initialize socket with session recovery
-  const socketClient = SocketClient.getInstance();
-  const socket = socketClient.connect(undefined, {
-    autoRecovery: true,
-    sessionRecoveryCallback: () => {
-      // This will be called on reconnection
-      console.log('Socket reconnected, attempting session recovery...');
-      attemptAutoRecovery();
-    }
-  });
+  // The socket is created in an effect so it only ever runs in the browser
+  // (never during server rendering or prerender) and only once per mount.
+  const [socket, setSocket] = useState<Socket | null>(null);
+  const attemptAutoRecoveryRef = useRef<() => void>(() => {});
+
+  useEffect(() => {
+    const socketClient = SocketClient.getInstance();
+    const s = socketClient.connect(undefined, {
+      autoRecovery: true,
+      sessionRecoveryCallback: () => {
+        console.log('Socket reconnected, attempting session recovery...');
+        attemptAutoRecoveryRef.current();
+      }
+    });
+    setSocket(s as unknown as Socket);
+  }, []);
 
   // Use session recovery hook
   const {
@@ -56,6 +63,10 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     attemptAutoRecovery,
     clearSessionData
   } = useSessionRecovery(socket);
+
+  useEffect(() => {
+    attemptAutoRecoveryRef.current = attemptAutoRecovery;
+  }, [attemptAutoRecovery]);
 
   // Set mounted flag to prevent SSR issues
   useEffect(() => {

@@ -66,8 +66,13 @@ export interface ParticipantSubmission {
   answers: ParticipantAnswer[];
   submissionTime: number;
   score?: number;
+  percentage?: number;
+  passed?: boolean;
   isComplete: boolean;
 }
+
+// What participants receive for a question: never includes the correct index.
+export type PublicQuizQuestion = Pick<QuizQuestion, 'text' | 'options'> & { correct?: number };
 
 export interface LeaderboardEntry {
   rank: number;
@@ -124,6 +129,8 @@ export interface SessionData {
   pollHistory: object[];
   teamName?: string;
   userInfo?: Record<string, unknown>;
+  hostToken?: string;
+  isHost?: boolean;
 }
 
 export interface SessionRecoveryRequest {
@@ -131,6 +138,7 @@ export interface SessionRecoveryRequest {
   userInfo?: {
     teamName?: string;
     isHost?: boolean;
+    hostToken?: string;
     [key: string]: unknown;
   };
 }
@@ -138,7 +146,7 @@ export interface SessionRecoveryRequest {
 // Socket.io event types
 export interface ServerToClientEvents {
   // Session recovery events
-  'session-created': (data: { sessionId: string; sessionData: SessionData }) => void;
+  'session-created': (data: { sessionId: string; hostToken?: string; sessionData: SessionData }) => void;
   'session-joined': (data: { sessionId: string; sessionData: SessionData }) => void;
   'session-recovered': (data: { sessionId: string; sessionData: SessionData }) => void;
   'session-not-found': (data: { sessionId: string }) => void;
@@ -161,27 +169,26 @@ export interface ServerToClientEvents {
   'celebrate': (data: CelebrationData) => void;
   'answer-revealed': (data: { revealedAnswer: number }) => void;
   'quiz-ended': (data: { message: string }) => void;
-  'score-update': (data: { teams: ScoreData[] }) => void;
   'error': (data: { message: string }) => void;
   'connect': () => void;
   'disconnect': () => void;
   'connect_error': (error: Error) => void;
   
   // New mode selection events
-  'quiz-mode-set': (data: { mode: QuizMode; settings: QuizSettings }) => void;
+  'quiz-mode-set': (data: { mode: QuizMode; settings: QuizSettings; questions?: PublicQuizQuestion[] }) => void;
+  'quiz-settings-updated': (data: { settings: QuizSettings }) => void;
   
   // Basic mode events
-  'basic-quiz-submitted': (submission: ParticipantSubmission) => void;
+  'basic-quiz-submitted': (data: ParticipantSubmission | { submission: ParticipantSubmission; totalQuestions: number; correctAnswers?: number[] }) => void;
   'submission-received': (data: { participantName: string; submissionTime: number }) => void;
   'submissions-count-update': (data: { count: number; total: number }) => void;
   'results-summary': (data: { submissions: ParticipantSubmission[] }) => void;
-  'quiz-results': (data: { submission: ParticipantSubmission }) => void;
   
   // Scheduled mode events
   'submission-stored': (data: { participantName: string }) => void;
   'all-submissions': (data: { submissions: ParticipantSubmission[]; revealedQuestions: RevealState[] }) => void;
   'question-revealed': (data: { questionIndex: number; correctAnswer: number }) => void;
-  'all-questions-revealed': (data: { leaderboard: LeaderboardEntry[] }) => void;
+  'all-questions-revealed': (data: { leaderboard: LeaderboardEntry[]; correctAnswers?: number[] }) => void;
   'leaderboard-updated': (data: { leaderboard: LeaderboardEntry[]; visible: boolean }) => void;
   'leaderboard-visibility-changed': (data: { visible: boolean }) => void;
   'announcement': (data: { message: string; timestamp: number }) => void;
@@ -195,7 +202,7 @@ export interface ClientToServerEvents {
   'recover-session': (data: SessionRecoveryRequest) => void;
   
   // Session-based question management events
-  'update-session-questions': (data: { sessionId: string; questions: QuizQuestion[] }) => void;
+  'update-session-questions': (data: { sessionId: string; questions: QuizQuestion[]; reset?: boolean }) => void;
   'get-session-questions': (data: { sessionId: string }) => void;
   
   // Existing buzzer mode events
@@ -214,15 +221,12 @@ export interface ClientToServerEvents {
   
   // Basic mode events
   'submit-basic-quiz': (data: { participantName: string; answers: ParticipantAnswer[] }) => void;
-  'submit-quiz': (data: { participantName: string; answers: ParticipantAnswer[] }) => void;
   'get-submissions-count': () => void;
-  'get-submissions-list': () => void;
   'get-results-summary': () => void;
   'quiz-settings-update': (data: { settings: Partial<QuizSettings> }) => void;
   
   // Scheduled mode events  
   'submit-answers': (data: { participantName: string; answers: ParticipantAnswer[] }) => void;
-  'submit-scheduled-quiz': (data: { participantName: string; answers: ParticipantAnswer[] }) => void;
   'get-all-submissions': () => void;
   'reveal-question': (data: { questionIndex: number }) => void;
   'reveal-all': () => void;
