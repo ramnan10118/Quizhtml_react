@@ -1,5 +1,5 @@
 import { supabase } from './supabase'
-import { QuizQuestion } from '@/types/quiz'
+import { QuizQuestion, ParticipantSubmission, LeaderboardEntry } from '@/types/quiz'
 import { PollCreateData } from '@/types/polling'
 
 export interface QuizDraft {
@@ -78,8 +78,8 @@ export interface LiveQuiz {
       passingScore?: number
     }
     revealedQuestions: { questionIndex: number; isRevealed: boolean; revealedAt?: number }[]
-    submissions: any[]
-    leaderboard: any[]
+    submissions: ParticipantSubmission[]
+    leaderboard: LeaderboardEntry[]
     leaderboardVisible: boolean
   }
   created_at: string

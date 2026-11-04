@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
     console.log('Generating questions with params:', { topic, difficulty, questionCount });
     
     const result = await generateObject({
-      model: openai('gpt-3.5-turbo'),
+      model: openai('gpt-4o-mini'),
       schema: QuestionSchema,
       prompt: `You are a quiz question generator. Generate exactly ${questionCount} multiple choice questions about "${topic}" with ${difficulty} difficulty.
 

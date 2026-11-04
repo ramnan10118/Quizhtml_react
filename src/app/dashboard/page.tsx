@@ -310,10 +310,7 @@ export default function DashboardPage() {
                       <div className="text-sm text-gray-600 dark:text-gray-400 mb-4">
                         {item.status === 'draft' ? (
                           <>
-                            {(item as QuizDraft).questions && Array.isArray((item as QuizDraft).questions) 
-                              ? `${(item as QuizDraft).questions.length} questions`
-                              : '0 questions'
-                            } • Created {new Date(item.created_at).toLocaleDateString()}
+                            {`${(item as QuizDraft).questions?.length ?? 0} questions`} • Created {new Date(item.created_at).toLocaleDateString()}
                           </>
                         ) : (
                           <>

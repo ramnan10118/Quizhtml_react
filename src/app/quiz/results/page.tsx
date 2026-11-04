@@ -1,14 +1,14 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Header } from '@/components/layout/Header';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
-import { quizHistory, LiveQuiz } from '@/lib/drafts';
+import { liveQuizzes, LiveQuiz } from '@/lib/drafts';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 
-export default function QuizResultsPage() {
+function QuizResultsPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [quiz, setQuiz] = useState<LiveQuiz | null>(null);
@@ -27,7 +27,7 @@ export default function QuizResultsPage() {
       try {
         setLoading(true);
         // Get quiz from history (includes both drafts and completed quizzes)
-        const quizData = await quizHistory.getById(quizId);
+        const quizData = await liveQuizzes.getById(quizId);
         if (!quizData) {
           setError('Quiz not found or no longer available');
         } else {
@@ -221,7 +221,7 @@ export default function QuizResultsPage() {
                   No Participants Yet
                 </h3>
                 <p className="text-gray-500 dark:text-gray-400">
-                  This quiz hasn't received any submissions.
+                  This quiz hasn&apos;t received any submissions.
                 </p>
               </CardContent>
             </Card>
@@ -229,5 +229,13 @@ export default function QuizResultsPage() {
         </main>
       </div>
     </ProtectedRoute>
+  );
+}
+
+export default function QuizResultsPage() {
+  return (
+    <Suspense fallback={null}>
+      <QuizResultsPageContent />
+    </Suspense>
   );
 }

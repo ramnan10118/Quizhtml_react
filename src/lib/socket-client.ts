@@ -65,12 +65,13 @@ class SocketClient {
       // Enhanced disconnect handler moved below
 
       // Note: These events are not in the typed interface but exist in Socket.IO
-      (this.socket as any).on('reconnect', (attemptNumber: number) => {
+      // Reconnect lifecycle events live on the underlying Manager, which is typed
+      this.socket.io.on('reconnect', (attemptNumber: number) => {
         console.log('Reconnected to server after', attemptNumber, 'attempts');
         this.isReconnecting = true;
       });
 
-      (this.socket as any).on('reconnect_attempt', (attemptNumber: number) => {
+      this.socket.io.on('reconnect_attempt', (attemptNumber: number) => {
         console.log('Attempting to reconnect... attempt', attemptNumber);
       });
 
@@ -78,9 +79,9 @@ class SocketClient {
         console.error('Socket connection error:', error);
         
         // If websocket fails, force polling transport
-        if (error.message?.includes('websocket') || error.type === 'TransportError') {
+        if (error.message?.includes('websocket') || (error as Error & { type?: string }).type === 'TransportError') {
           console.log('🔄 Websocket failed, falling back to polling only');
-          this.socket.io.opts.transports = ['polling'];
+          if (this.socket) this.socket.io.opts.transports = ['polling'];
         }
       });
 
@@ -90,7 +91,7 @@ class SocketClient {
         // If websocket upgrade failed, stick to polling
         if (reason === 'transport error' || reason === 'transport close') {
           console.log('🔄 Transport error detected, using polling for reconnection');
-          this.socket.io.opts.transports = ['polling'];
+          if (this.socket) this.socket.io.opts.transports = ['polling'];
         }
         
         // Mark as reconnecting for potential session recovery

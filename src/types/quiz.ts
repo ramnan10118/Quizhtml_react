@@ -142,6 +142,9 @@ export interface ServerToClientEvents {
   'session-joined': (data: { sessionId: string; sessionData: SessionData }) => void;
   'session-recovered': (data: { sessionId: string; sessionData: SessionData }) => void;
   'session-not-found': (data: { sessionId: string }) => void;
+  'session-joined-successfully': (data: { sessionId: string; teamName: string }) => void;
+  'session-join-failed': (data: { sessionId: string; error: string }) => void;
+  'session-creation-error': (data: { error: string }) => void;
   'participant-joined': (data: { socketId: string; teamName: string }) => void;
   'participant-disconnected': (data: { socketId: string; teamName: string }) => void;
   
@@ -186,8 +189,9 @@ export interface ServerToClientEvents {
 
 export interface ClientToServerEvents {
   // Session recovery events
-  'create-session': (data: { type?: 'quiz' | 'poll'; userInfo?: Record<string, unknown> }) => void;
+  'create-session': (data: { type?: 'quiz' | 'poll'; userInfo?: Record<string, unknown>; customSessionId?: string; initialMode?: QuizMode }) => void;
   'join-session': (data: { sessionId: string; teamName: string }) => void;
+  'join-quiz-session': (data: { sessionId: string; teamName: string }) => void;
   'recover-session': (data: SessionRecoveryRequest) => void;
   
   // Session-based question management events
@@ -206,7 +210,7 @@ export interface ClientToServerEvents {
   'host-exit-quiz': () => void;
   
   // Mode selection events
-  'set-quiz-mode': (data: { mode: QuizMode; settings: QuizSettings }) => void;
+  'set-quiz-mode': (data: { mode: QuizMode; settings: QuizSettings; liveQuizId?: string }) => void;
   
   // Basic mode events
   'submit-basic-quiz': (data: { participantName: string; answers: ParticipantAnswer[] }) => void;

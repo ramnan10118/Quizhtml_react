@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Header } from '@/components/layout/Header';
 import { QuestionDisplay } from '@/components/quiz/QuestionDisplay';
@@ -14,7 +14,7 @@ import { useQuizState } from '@/hooks/useQuizState';
 import { QuizMode, QuizSettings, ParticipantSubmission, RevealState, LeaderboardEntry, QuizQuestion } from '@/types/quiz';
 import { liveQuizzes, LiveQuiz } from '@/lib/drafts';
 
-export default function HostPage() {
+function HostPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { socket } = useSocket();
@@ -122,7 +122,7 @@ export default function HostPage() {
       if (freshSavedData) {
         console.log('🔄 Found saved session, attempting recovery:', freshSavedData);
         
-        let recoveryTimeoutId: NodeJS.Timeout | null = null;
+        const recoveryTimeoutId: NodeJS.Timeout | null = null;
         
         const handleSessionRecovered = (data: { sessionId: string }) => {
           console.log('✅ Session recovered successfully:', data.sessionId);
@@ -164,6 +164,7 @@ export default function HostPage() {
     }
     
     function createNewSession() {
+      if (!socket) return;
       // Determine session type and mode
       const liveQuizId = searchParams.get('live');
       const isLiveQuiz = !!liveQuizId;
@@ -202,7 +203,7 @@ export default function HostPage() {
         console.log('✅ Session creation completed and listener removed');
       };
       
-      const handleSessionError = (error: any) => {
+      const handleSessionError = (error: unknown) => {
         console.error('❌ Session creation failed:', error);
       };
       
@@ -243,7 +244,7 @@ export default function HostPage() {
             console.log('📝 Loading live quiz:', liveQuiz);
             setCurrentLiveQuiz(liveQuiz);
             setCurrentMode('scheduled'); // Live quizzes use scheduled mode
-            setCurrentSettings(liveQuiz.content.settings);
+            setCurrentSettings({ mode: 'scheduled', ...liveQuiz.content.settings });
             setQuestions(liveQuiz.content.questions);
             setRevealedQuestions(liveQuiz.content.revealedQuestions);
             setScheduledSubmissions(liveQuiz.content.submissions || []);
@@ -728,5 +729,13 @@ export default function HostPage() {
         </div>
       </main>
     </div>
+  );
+}
+
+export default function HostPage() {
+  return (
+    <Suspense fallback={null}>
+      <HostPageContent />
+    </Suspense>
   );
 }

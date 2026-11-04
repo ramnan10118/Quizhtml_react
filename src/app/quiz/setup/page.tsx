@@ -4,7 +4,7 @@ import React, { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Header } from '@/components/layout/Header'
 import { Card, CardContent, CardHeader, CardTitle, Button, Input } from '@/components/ui'
-import { QuizQuestion } from '@/types/quiz';
+import { QuizQuestion, QuizSettings } from '@/types/quiz';
 import { quizDrafts, liveQuizzes } from '@/lib/drafts';
 import { useAuth } from '@/contexts/AuthContext';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
@@ -24,7 +24,7 @@ function QuizSetupContent() {
   
   // Quiz mode state
   const [selectedMode, setSelectedMode] = useState<'buzzer' | 'basic' | 'scheduled'>('buzzer');
-  const [modeSettings, setModeSettings] = useState<any>(null);
+  const [modeSettings, setModeSettings] = useState<QuizSettings | null>(null);
   
   // Save draft modal state
   const [showSaveModal, setShowSaveModal] = useState(false);
